@@ -238,19 +238,38 @@ const btnConfirmResetSurah = document.getElementById('btnConfirmResetSurah');
 const btnConfirmResetAll = document.getElementById('btnConfirmResetAll');
 const resetSurahNameDesc = document.getElementById('resetSurahNameDesc');
 
-// Whole Surah Recall Mode Elements
-const memToggleRecallBtn = document.getElementById('memToggleRecallBtn');
-const toggleWholeSurahRecall = document.getElementById('toggleWholeSurahRecall');
-const recallHudContainer = document.getElementById('recallHudContainer');
-const recallStatsCounter = document.getElementById('recallStatsCounter');
-const recallAyahTitle = document.getElementById('recallAyahTitle');
-const btnRecallPrevAyah = document.getElementById('btnRecallPrevAyah');
-const btnRecallToggleAyah = document.getElementById('btnRecallToggleAyah');
-const btnRecallNextAyah = document.getElementById('btnRecallNextAyah');
-const btnRecallFlagMistake = document.getElementById('btnRecallFlagMistake');
-const btnRecallGradeAyah = document.getElementById('btnRecallGradeAyah');
-const btnRecallExit = document.getElementById('btnRecallExit');
-const recallProgressBarFill = document.getElementById('recallProgressBarFill');
+// Voice Recorder & Playback Elements (Memorize Mode)
+const memVoiceRecBtn = document.getElementById('memVoiceRecBtn');
+const voiceRecorderHud = document.getElementById('voiceRecorderHud');
+const voiceRecDot = document.getElementById('voiceRecDot');
+const voiceRecStatus = document.getElementById('voiceRecStatus');
+const voiceRecTimer = document.getElementById('voiceRecTimer');
+const voiceRecVerseBadge = document.getElementById('voiceRecVerseBadge');
+const closeVoiceRecorderBtn = document.getElementById('closeVoiceRecorderBtn');
+const voiceRecQariRow = document.getElementById('voiceRecQariRow');
+const voiceRecQariLabel = document.getElementById('voiceRecQariLabel');
+const voiceQariTimeDisplay = document.getElementById('voiceQariTimeDisplay');
+const btnCloseAyahAudioBar = document.getElementById('btnCloseAyahAudioBar');
+const btnVoiceQariPlayMini = document.getElementById('btnVoiceQariPlayMini');
+const voiceRecQariTrack = document.getElementById('voiceRecQariTrack');
+const voiceRecQariProgress = document.getElementById('voiceRecQariProgress');
+const voiceRecUserRow = document.getElementById('voiceRecUserRow');
+const voiceRecUserHeader = document.getElementById('voiceRecUserHeader');
+const btnVoiceUserPlayMini = document.getElementById('btnVoiceUserPlayMini');
+const voiceUserTimeDisplay = document.getElementById('voiceUserTimeDisplay');
+const voiceRecPlaybackTrack = document.getElementById('voiceRecPlaybackTrack');
+const voiceRecProgress = document.getElementById('voiceRecProgress');
+const btnVoiceToggleRecord = document.getElementById('btnVoiceToggleRecord');
+const voiceRecIcon = document.getElementById('voiceRecIcon');
+const voiceRecBtnText = document.getElementById('voiceRecBtnText');
+const btnVoiceTogglePlay = document.getElementById('btnVoiceTogglePlay');
+const voicePlayIcon = document.getElementById('voicePlayIcon');
+const voicePlayBtnText = document.getElementById('voicePlayBtnText');
+const btnVoiceCompareQari = document.getElementById('btnVoiceCompareQari');
+const voiceQariBtnIcon = document.getElementById('voiceQariBtnIcon');
+const voiceQariBtnText = document.getElementById('voiceQariBtnText');
+const btnVoiceDiscard = document.getElementById('btnVoiceDiscard');
+const btnGradingVoiceRec = document.getElementById('btnGradingVoiceRec');
 
 // FSRS Notifications Elements
 const fsrsNotificationToast = document.getElementById('fsrsNotificationToast');
@@ -726,13 +745,6 @@ function updateBanner() {
 }
 
 function renderViews() {
-  if (isRecallMode) {
-    currentRecallVerseIdx = 0;
-    recallRevealedVerses.clear();
-    renderReadingView();
-    updateRecallHud();
-    return;
-  }
   // Lazy render: only render the active view to avoid unnecessary DOM operations
   if (currentView === 'reading' || isMemorizeMode) {
     renderReadingView();
@@ -802,9 +814,7 @@ function renderReadingView() {
   totalWordElements = Array.from(readingView.querySelectorAll('.mushaf-word'));
   totalAyahMarkers = Array.from(readingView.querySelectorAll('.ayah-marker'));
 
-  if (isRecallMode) {
-    applyRecallVersesState();
-  } else if (isMemorizeMode) {
+  if (isMemorizeMode) {
     applyMemorizeState(true);
   }
   updateActiveMistakeButtonState();
@@ -1392,7 +1402,7 @@ function hideAyahContextMenu() {
 // =========================================================
 
 readingView.addEventListener('mouseover', (e) => {
-  if (isRecallMode || wordPopupTrigger === 'tap') return; // Tap or Recall mode active: ignore hover
+  if (wordPopupTrigger === 'tap') return; // Tap mode active: ignore hover
   const wordEl = e.target.closest('.mushaf-word');
   if (!wordEl) return;
   if (isMemorizeMode && wordEl.classList.contains('memorize-hidden')) return;
@@ -1401,7 +1411,7 @@ readingView.addEventListener('mouseover', (e) => {
 });
 
 readingView.addEventListener('mouseout', (e) => {
-  if (isRecallMode || wordPopupTrigger === 'tap') return;
+  if (wordPopupTrigger === 'tap') return;
   const wordEl = e.target.closest('.mushaf-word');
   if (!wordEl) return;
   hoverTimeout = setTimeout(() => {
@@ -1412,22 +1422,6 @@ readingView.addEventListener('mouseout', (e) => {
 });
 
 readingView.addEventListener('click', (e) => {
-  // 0. Whole Surah Recall Mode active: tapping anywhere in an Ayah reveals/hides or focuses it
-  if (isRecallMode) {
-    const verseSpan = e.target.closest('.reading-verse-span, .mushaf-verse-span');
-    if (verseSpan) {
-      e.stopPropagation();
-      const vIdx = parseInt(verseSpan.getAttribute('data-verse-idx'));
-      if (!isNaN(vIdx)) {
-        if (currentRecallVerseIdx === vIdx) {
-          toggleCurrentRecallVerse();
-        } else {
-          setRecallVerseIndex(vIdx);
-        }
-        return;
-      }
-    }
-  }
 
   const wordEl = e.target.closest('.mushaf-word');
   if (wordEl) {
@@ -2716,28 +2710,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  if (isRecallMode) {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      toggleCurrentRecallVerse();
-    } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      nextRecallVerse();
-    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      prevRecallVerse();
-    } else if (e.key.toLowerCase() === 'm' || e.key.toLowerCase() === 'x') {
-      e.preventDefault();
-      flagRecallMistake();
-    } else if (e.key.toLowerCase() === 'g') {
-      e.preventDefault();
-      gradeRecallVerse();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      toggleWholeSurahRecallMode(false);
-    }
-    return;
-  }
+
 
   if (isMemorizeMode) {
     // ArrowRight, ArrowDown, Space reveal next word
@@ -2749,6 +2722,11 @@ window.addEventListener('keydown', (e) => {
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'Backspace') {
       e.preventDefault();
       unrevealPreviousWord(false);
+    }
+    // 'r': Toggle Voice Recorder
+    else if (e.key.toLowerCase() === 'r') {
+      e.preventDefault();
+      toggleVoiceRecorder();
     }
     // 'm' or 'x': Mark/Unmark Mistake on active word
     else if (e.key.toLowerCase() === 'm' || e.key.toLowerCase() === 'x') {
@@ -3607,195 +3585,7 @@ if (fsrsResetModal) {
   });
 }
 
-// =========================================================
-// WHOLE SURAH RECALL MODE CONTROLLER & HUD
-// =========================================================
 
-let isRecallMode = false;
-let currentRecallVerseIdx = 0;
-let recallRevealedVerses = new Set();
-
-function toggleWholeSurahRecallMode(forceState) {
-  const nextState = (typeof forceState === 'boolean') ? forceState : !isRecallMode;
-  if (nextState === isRecallMode) return;
-
-  isRecallMode = nextState;
-  document.body.classList.toggle('recall-active', isRecallMode);
-
-  if (toggleWholeSurahRecall) toggleWholeSurahRecall.checked = isRecallMode;
-  if (memToggleRecallBtn) memToggleRecallBtn.classList.toggle('active', isRecallMode);
-
-  if (isRecallMode) {
-    if (currentView !== 'reading') switchView('reading');
-    currentRecallVerseIdx = 0;
-    recallRevealedVerses.clear();
-    if (recallHudContainer) recallHudContainer.style.display = 'block';
-    applyRecallVersesState();
-    updateRecallHud();
-    scrollRecallCurrentVerseIntoView();
-    showToastNotification('📖 Whole Surah Recall Mode started. Recite from memory and tap Space to reveal.');
-  } else {
-    if (recallHudContainer) recallHudContainer.style.display = 'none';
-    clearRecallVersesClasses();
-    if (isMemorizeMode) {
-      applyMemorizeState(false);
-    }
-    showToastNotification('Exited Whole Surah Recall Mode');
-  }
-}
-
-function updateRecallHud() {
-  if (!surahData || !surahData.verses) return;
-  const totalVerses = surahData.verses.length;
-  const currentNum = currentRecallVerseIdx + 1;
-  const verse = surahData.verses[currentRecallVerseIdx];
-
-  const revealedCount = recallRevealedVerses.size;
-  const percent = totalVerses > 0 ? Math.round((revealedCount / totalVerses) * 100) : 0;
-
-  if (recallStatsCounter) {
-    recallStatsCounter.textContent = `Ayah ${currentNum} of ${totalVerses} • ${percent}% revealed`;
-  }
-  if (recallProgressBarFill) {
-    const prog = totalVerses > 0 ? ((currentNum) / totalVerses) * 100 : 0;
-    recallProgressBarFill.style.width = `${prog}%`;
-  }
-
-  if (recallAyahTitle && verse) {
-    const firstWords = verse.words.slice(0, 4).map(w => w.arabic).join(' ');
-    recallAyahTitle.textContent = `Ayah ${currentNum} : "${firstWords}..."`;
-  }
-
-  const isRevealed = recallRevealedVerses.has(currentRecallVerseIdx);
-  if (btnRecallToggleAyah) {
-    btnRecallToggleAyah.innerHTML = isRevealed
-      ? `🙈 Hide Ayah <span class="recall-key-hint">Space</span>`
-      : `👁 Reveal Ayah <span class="recall-key-hint">Space</span>`;
-  }
-
-  const mistakeKey = `${currentSurahNumber}:${currentNum}`;
-  const hasMistake = memorizeMistakes && !!memorizeMistakes[mistakeKey];
-  if (btnRecallFlagMistake) {
-    btnRecallFlagMistake.classList.toggle('active', hasMistake);
-  }
-}
-
-function applyRecallVersesState() {
-  if (!surahData || !surahData.verses) return;
-  const spans = document.querySelectorAll('.reading-verse-span, .mushaf-verse-span');
-  spans.forEach(span => {
-    const vIdx = parseInt(span.getAttribute('data-verse-idx'));
-    if (isNaN(vIdx)) return;
-
-    const isCurrent = (vIdx === currentRecallVerseIdx);
-    const isRevealed = recallRevealedVerses.has(vIdx);
-    const vNum = vIdx + 1;
-    const mistakeKey = `${currentSurahNumber}:${vNum}`;
-    const hasMistake = memorizeMistakes && !!memorizeMistakes[mistakeKey];
-
-    span.classList.remove('recall-hidden', 'recall-revealed', 'recall-current', 'recall-mistake');
-
-    if (isRevealed) {
-      span.classList.add('recall-revealed');
-    } else {
-      span.classList.add('recall-hidden');
-    }
-
-    if (isCurrent) {
-      span.classList.add('recall-current');
-    }
-
-    if (hasMistake) {
-      span.classList.add('recall-mistake');
-    }
-  });
-}
-
-function clearRecallVersesClasses() {
-  const spans = document.querySelectorAll('.reading-verse-span, .mushaf-verse-span');
-  spans.forEach(span => {
-    span.classList.remove('recall-hidden', 'recall-revealed', 'recall-current', 'recall-mistake');
-  });
-}
-
-function scrollRecallCurrentVerseIntoView() {
-  const currentSpan = document.getElementById(`reading-verse-span-${currentRecallVerseIdx}`);
-  if (currentSpan) {
-    currentSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-}
-
-function setRecallVerseIndex(idx) {
-  if (!surahData || !surahData.verses) return;
-  const maxIdx = surahData.verses.length - 1;
-  const clamped = Math.max(0, Math.min(idx, maxIdx));
-  currentRecallVerseIdx = clamped;
-  applyRecallVersesState();
-  updateRecallHud();
-  scrollRecallCurrentVerseIntoView();
-}
-
-function toggleCurrentRecallVerse() {
-  if (recallRevealedVerses.has(currentRecallVerseIdx)) {
-    recallRevealedVerses.delete(currentRecallVerseIdx);
-  } else {
-    recallRevealedVerses.add(currentRecallVerseIdx);
-  }
-  applyRecallVersesState();
-  updateRecallHud();
-}
-
-function nextRecallVerse() {
-  if (!surahData || !surahData.verses) return;
-  if (currentRecallVerseIdx < surahData.verses.length - 1) {
-    setRecallVerseIndex(currentRecallVerseIdx + 1);
-  } else {
-    showToastNotification('MashaAllah! You reached the end of Surah recitation recall.');
-  }
-}
-
-function prevRecallVerse() {
-  if (currentRecallVerseIdx > 0) {
-    setRecallVerseIndex(currentRecallVerseIdx - 1);
-  }
-}
-
-function flagRecallMistake() {
-  if (!surahData || !surahData.verses) return;
-  const vNum = currentRecallVerseIdx + 1;
-  const mistakeKey = `${currentSurahNumber}:${vNum}`;
-  if (memorizeMistakes[mistakeKey]) {
-    delete memorizeMistakes[mistakeKey];
-    showToastNotification(`✓ Cleared mistake flag on Ayah ${vNum}`);
-  } else {
-    memorizeMistakes[mistakeKey] = {
-      timestamp: Date.now(),
-      surah: currentSurahNumber,
-      verse: vNum
-    };
-    showToastNotification(`🚩 Flagged mistake on Ayah ${vNum}`);
-  }
-  saveMistakes(memorizeMistakes);
-  applyRecallVersesState();
-  updateRecallHud();
-}
-
-function gradeRecallVerse() {
-  if (!surahData || !surahData.verses) return;
-  const vNum = currentRecallVerseIdx + 1;
-  openAyahGradingModal(currentSurahNumber, vNum);
-}
-
-// Wire Recall Mode Buttons
-if (memToggleRecallBtn) memToggleRecallBtn.addEventListener('click', () => toggleWholeSurahRecallMode());
-if (toggleWholeSurahRecall) toggleWholeSurahRecall.addEventListener('change', (e) => toggleWholeSurahRecallMode(e.target.checked));
-
-if (btnRecallPrevAyah) btnRecallPrevAyah.addEventListener('click', prevRecallVerse);
-if (btnRecallToggleAyah) btnRecallToggleAyah.addEventListener('click', toggleCurrentRecallVerse);
-if (btnRecallNextAyah) btnRecallNextAyah.addEventListener('click', nextRecallVerse);
-if (btnRecallFlagMistake) btnRecallFlagMistake.addEventListener('click', flagRecallMistake);
-if (btnRecallGradeAyah) btnRecallGradeAyah.addEventListener('click', gradeRecallVerse);
-if (btnRecallExit) btnRecallExit.addEventListener('click', () => toggleWholeSurahRecallMode(false));
 
 // =========================================================
 // FSRS NOTIFICATIONS & REAL-TIME BADGE ENGINE
@@ -4205,6 +3995,539 @@ if (topSurahDueBadge) {
     openFsrsBrowser();
   });
 }
+
+// =========================================================
+// VOICE RECORDER & PLAYBACK ENGINE (MEMORIZE MODE)
+// =========================================================
+
+let mediaRecorder = null;
+let mediaStream = null;
+let recordedAudioChunks = [];
+let currentVoiceBlob = null;
+let currentVoiceUrl = null;
+let voicePlaybackAudio = new Audio();
+let isVoiceRecording = false;
+let isVoicePlaying = false;
+let voiceTimerInterval = null;
+let voiceRecordDuration = 0;
+let voiceActiveSurah = 0;
+let voiceActiveVerse = 0;
+const recordedClipsStore = {}; // map `${surah}:${verse}` -> { blob, url, duration }
+
+function getActiveMemorizeVerseNum() {
+  if (ayahGradingOverlay && ayahGradingOverlay.classList.contains('show')) {
+    if (surahData && surahData.verses[currentGradingVerseIndex]) {
+      return surahData.verses[currentGradingVerseIndex].verseNumber;
+    }
+  }
+  if (isMemorizeMode) {
+    if (revealedWordCount > 0 && totalWordElements[revealedWordCount - 1]) {
+      const vNum = parseInt(totalWordElements[revealedWordCount - 1].getAttribute('data-verse-num'));
+      if (!isNaN(vNum) && vNum > 0) return vNum;
+    }
+  }
+  if (currentAudioIndex >= 0 && surahData && surahData.verses[currentAudioIndex]) {
+    return surahData.verses[currentAudioIndex].verseNumber;
+  }
+  return 1;
+}
+
+function formatVoiceTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+function getSupportedVoiceMimeType() {
+  const candidates = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/aac',
+    'audio/ogg;codecs=opus',
+    'audio/wav'
+  ];
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+    for (const type of candidates) {
+      if (MediaRecorder.isTypeSupported(type)) {
+        return type;
+      }
+    }
+  }
+  return '';
+}
+
+let isAyahAudioOn = false;
+
+function syncAyahAudioBar() {
+  if (!voiceRecQariRow || voiceRecQariRow.style.display === 'none') return;
+  const cur = (audioPlayer && audioPlayer.currentTime) || 0;
+  const dur = (audioPlayer && audioPlayer.duration) || 0;
+  if (dur && !isNaN(dur)) {
+    const pct = Math.min(100, (cur / dur) * 100);
+    if (voiceRecQariProgress) voiceRecQariProgress.style.width = `${pct}%`;
+    if (voiceQariTimeDisplay) voiceQariTimeDisplay.textContent = `${formatVoiceTime(cur)} / ${formatVoiceTime(dur)}`;
+  } else {
+    if (voiceRecQariProgress) voiceRecQariProgress.style.width = '0%';
+    if (voiceQariTimeDisplay) voiceQariTimeDisplay.textContent = `${formatVoiceTime(cur)} / --:--`;
+  }
+}
+
+function setAyahAudioInHud(enable, autoStartPlay = true) {
+  isAyahAudioOn = enable;
+  if (isAyahAudioOn) {
+    if (voiceRecQariRow) voiceRecQariRow.style.display = 'flex';
+    if (voiceRecUserHeader) voiceRecUserHeader.style.display = 'flex';
+    if (btnVoiceCompareQari) {
+      btnVoiceCompareQari.classList.add('active');
+      if (voiceQariBtnText) voiceQariBtnText.textContent = 'Ayah Audio: ON';
+    }
+    if (voiceRecQariLabel) {
+      voiceRecQariLabel.textContent = `Ayah ${voiceActiveVerse} (Qari)`;
+    }
+    if (autoStartPlay) {
+      if (isVoicePlaying) stopVoicePlayback();
+      const verseIdx = Math.max(0, voiceActiveVerse - 1);
+      if (!audioPlayer.src || currentAudioIndex !== verseIdx) {
+        playAyah(verseIdx);
+      } else if (audioPlayer.paused) {
+        safePlay(audioPlayer);
+      }
+    }
+    syncAyahAudioBar();
+  } else {
+    if (voiceRecQariRow) voiceRecQariRow.style.display = 'none';
+    if (voiceRecUserHeader) voiceRecUserHeader.style.display = 'none';
+    if (btnVoiceCompareQari) {
+      btnVoiceCompareQari.classList.remove('active', 'playing');
+      if (voiceQariBtnText) voiceQariBtnText.textContent = 'Ayah Audio';
+    }
+    if (btnVoiceQariPlayMini) {
+      btnVoiceQariPlayMini.textContent = '▶';
+      btnVoiceQariPlayMini.title = 'Play Ayah Audio';
+    }
+    if (audioPlayer && !audioPlayer.paused) {
+      audioPlayer.pause();
+      updatePlayPauseButton(false);
+    }
+  }
+}
+
+function toggleAyahAudioInHud() {
+  setAyahAudioInHud(!isAyahAudioOn, true);
+}
+
+function updateVoiceRecorderAyah(verseNum) {
+  voiceActiveSurah = currentSurahNumber || 1;
+  voiceActiveVerse = verseNum || getActiveMemorizeVerseNum();
+
+  if (voiceRecVerseBadge) {
+    voiceRecVerseBadge.textContent = `Surah ${voiceActiveSurah}:${voiceActiveVerse}`;
+  }
+  if (voiceRecQariLabel) {
+    voiceRecQariLabel.textContent = `Ayah ${voiceActiveVerse} (Qari)`;
+  }
+
+  // Check if clip exists for this verse
+  const clipKey = `${voiceActiveSurah}:${voiceActiveVerse}`;
+  const clip = recordedClipsStore[clipKey];
+
+  if (clip) {
+    currentVoiceBlob = clip.blob;
+    currentVoiceUrl = clip.url;
+    voicePlaybackAudio.src = currentVoiceUrl;
+    if (btnVoiceTogglePlay) btnVoiceTogglePlay.disabled = false;
+    if (btnVoiceUserPlayMini) btnVoiceUserPlayMini.disabled = false;
+    if (btnVoiceDiscard) btnVoiceDiscard.disabled = false;
+    if (voiceRecStatus) voiceRecStatus.textContent = `Recitation ready`;
+    const durStr = formatVoiceTime(clip.duration || 0);
+    if (voiceRecTimer) voiceRecTimer.textContent = durStr;
+    if (voiceUserTimeDisplay) voiceUserTimeDisplay.textContent = durStr;
+    if (memVoiceRecBtn) memVoiceRecBtn.classList.add('has-voice');
+  } else {
+    if (!isVoiceRecording && !isVoicePlaying) {
+      currentVoiceBlob = null;
+      currentVoiceUrl = null;
+      voicePlaybackAudio.removeAttribute('src');
+      if (btnVoiceTogglePlay) {
+        btnVoiceTogglePlay.disabled = true;
+        btnVoiceTogglePlay.classList.remove('playing');
+      }
+      if (btnVoiceUserPlayMini) {
+        btnVoiceUserPlayMini.disabled = true;
+        btnVoiceUserPlayMini.textContent = '▶';
+      }
+      if (btnVoiceDiscard) btnVoiceDiscard.disabled = true;
+      if (voiceRecStatus) voiceRecStatus.textContent = 'Voice Recitation';
+      if (voiceRecTimer) voiceRecTimer.textContent = '00:00';
+      if (voiceUserTimeDisplay) voiceUserTimeDisplay.textContent = '00:00';
+      if (voiceRecProgress) voiceRecProgress.style.width = '0%';
+      if (memVoiceRecBtn) memVoiceRecBtn.classList.remove('has-voice');
+    }
+  }
+  syncAyahAudioBar();
+}
+
+function openVoiceRecorder(verseNum) {
+  if (!isMemorizeMode && (!ayahGradingOverlay || !ayahGradingOverlay.classList.contains('show'))) {
+    toggleMemorizeMode();
+  }
+  updateVoiceRecorderAyah(verseNum);
+  if (voiceRecorderHud) {
+    voiceRecorderHud.style.display = 'block';
+  }
+  // If Ayah audio is currently playing or previously set to ON, display two audio bars
+  if (audioPlayer && !audioPlayer.paused) {
+    setAyahAudioInHud(true, false);
+  } else if (isAyahAudioOn) {
+    setAyahAudioInHud(true, false);
+  } else {
+    setAyahAudioInHud(false, false);
+  }
+}
+
+function closeVoiceRecorder() {
+  if (isVoiceRecording) {
+    stopVoiceRecording();
+  }
+  if (isVoicePlaying) {
+    stopVoicePlayback();
+  }
+  if (voiceRecorderHud) {
+    voiceRecorderHud.style.display = 'none';
+  }
+}
+
+function toggleVoiceRecorder(verseNum) {
+  if (voiceRecorderHud && voiceRecorderHud.style.display !== 'none') {
+    closeVoiceRecorder();
+  } else {
+    openVoiceRecorder(verseNum);
+  }
+}
+
+async function startVoiceRecording() {
+  if (isVoiceRecording) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    alert('Audio recording is not supported in this browser. Please use Chrome, Safari, or Edge.');
+    return;
+  }
+
+  if (isVoicePlaying) {
+    stopVoicePlayback();
+  }
+  // If Ayah audio is NOT on, ensure audioPlayer is stopped.
+  // If Ayah audio is ON, user can recite along or pause via the mini button.
+  if (!isAyahAudioOn && audioPlayer && !audioPlayer.paused) {
+    audioPlayer.pause();
+    updatePlayPauseButton(false);
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = getSupportedVoiceMimeType();
+    const options = mimeType ? { mimeType } : undefined;
+
+    recordedAudioChunks = [];
+    mediaRecorder = new MediaRecorder(mediaStream, options);
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        recordedAudioChunks.push(e.data);
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      const finalMime = mimeType || 'audio/webm';
+      currentVoiceBlob = new Blob(recordedAudioChunks, { type: finalMime });
+      if (currentVoiceUrl) URL.revokeObjectURL(currentVoiceUrl);
+      currentVoiceUrl = URL.createObjectURL(currentVoiceBlob);
+
+      voicePlaybackAudio.src = currentVoiceUrl;
+
+      // Save clip for active Ayah
+      const clipKey = `${voiceActiveSurah}:${voiceActiveVerse}`;
+      recordedClipsStore[clipKey] = {
+        blob: currentVoiceBlob,
+        url: currentVoiceUrl,
+        duration: voiceRecordDuration
+      };
+
+      if (btnVoiceTogglePlay) btnVoiceTogglePlay.disabled = false;
+      if (btnVoiceUserPlayMini) btnVoiceUserPlayMini.disabled = false;
+      if (btnVoiceDiscard) btnVoiceDiscard.disabled = false;
+      if (memVoiceRecBtn) memVoiceRecBtn.classList.add('has-voice');
+
+      if (voiceRecStatus) voiceRecStatus.textContent = `Recorded • Ready to play`;
+      if (voiceUserTimeDisplay) voiceUserTimeDisplay.textContent = formatVoiceTime(voiceRecordDuration);
+      showToastNotification(`🎙️ Recitation recorded for Ayah ${voiceActiveVerse}! Tap Play to listen.`);
+
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(t => t.stop());
+        mediaStream = null;
+      }
+    };
+
+    mediaRecorder.start(200);
+    isVoiceRecording = true;
+    voiceRecordDuration = 0;
+
+    if (voiceRecDot) voiceRecDot.className = 'voice-rec-dot recording';
+    if (btnVoiceToggleRecord) {
+      btnVoiceToggleRecord.classList.add('recording');
+      if (voiceRecIcon) voiceRecIcon.textContent = '⏹';
+      if (voiceRecBtnText) voiceRecBtnText.textContent = 'Stop';
+    }
+    if (memVoiceRecBtn) memVoiceRecBtn.classList.add('recording');
+    if (btnGradingVoiceRec) btnGradingVoiceRec.classList.add('recording');
+    if (voiceRecStatus) voiceRecStatus.textContent = 'Recording recitation...';
+    if (voiceRecTimer) voiceRecTimer.textContent = '00:00';
+    if (voiceRecProgress) voiceRecProgress.style.width = '0%';
+    if (btnVoiceTogglePlay) btnVoiceTogglePlay.disabled = true;
+    if (btnVoiceUserPlayMini) btnVoiceUserPlayMini.disabled = true;
+    if (btnVoiceDiscard) btnVoiceDiscard.disabled = true;
+
+    recordingStartTime = Date.now();
+    clearInterval(voiceTimerInterval);
+    voiceTimerInterval = setInterval(() => {
+      voiceRecordDuration = (Date.now() - recordingStartTime) / 1000;
+      if (voiceRecTimer) {
+        voiceRecTimer.textContent = formatVoiceTime(voiceRecordDuration);
+      }
+      if (voiceUserTimeDisplay) {
+        voiceUserTimeDisplay.textContent = formatVoiceTime(voiceRecordDuration);
+      }
+    }, 250);
+
+  } catch (err) {
+    console.error('Failed to access microphone:', err);
+    alert('Microphone access was denied or is not available. Please allow microphone permission in your browser to record recitation.');
+  }
+}
+
+function stopVoiceRecording() {
+  if (!isVoiceRecording) return;
+  isVoiceRecording = false;
+  clearInterval(voiceTimerInterval);
+
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+  }
+
+  if (voiceRecDot) voiceRecDot.className = 'voice-rec-dot';
+  if (btnVoiceToggleRecord) {
+    btnVoiceToggleRecord.classList.remove('recording');
+    if (voiceRecIcon) voiceRecIcon.textContent = '🎙️';
+    if (voiceRecBtnText) voiceRecBtnText.textContent = 'Record';
+  }
+  if (memVoiceRecBtn) memVoiceRecBtn.classList.remove('recording');
+  if (btnGradingVoiceRec) btnGradingVoiceRec.classList.remove('recording');
+}
+
+function toggleVoiceRecording() {
+  if (isVoiceRecording) {
+    stopVoiceRecording();
+  } else {
+    startVoiceRecording();
+  }
+}
+
+function startVoicePlayback() {
+  if (!currentVoiceUrl) return;
+  if (audioPlayer && !audioPlayer.paused) {
+    audioPlayer.pause();
+    updatePlayPauseButton(false);
+  }
+
+  voicePlaybackAudio.src = currentVoiceUrl;
+  voicePlaybackAudio.play().then(() => {
+    isVoicePlaying = true;
+    if (voiceRecDot) voiceRecDot.className = 'voice-rec-dot playing';
+    if (btnVoiceTogglePlay) {
+      btnVoiceTogglePlay.classList.add('playing');
+      if (voicePlayIcon) voicePlayIcon.textContent = '⏸';
+      if (voicePlayBtnText) voicePlayBtnText.textContent = 'Pause';
+    }
+    if (btnVoiceUserPlayMini) {
+      btnVoiceUserPlayMini.textContent = '❚❚';
+    }
+    if (voiceRecStatus) voiceRecStatus.textContent = 'Playing your recitation...';
+  }).catch(err => {
+    console.warn('Voice playback failed:', err);
+  });
+}
+
+function stopVoicePlayback() {
+  if (!isVoicePlaying) return;
+  voicePlaybackAudio.pause();
+  isVoicePlaying = false;
+  if (voiceRecDot) voiceRecDot.className = 'voice-rec-dot';
+  if (btnVoiceTogglePlay) {
+    btnVoiceTogglePlay.classList.remove('playing');
+    if (voicePlayIcon) voicePlayIcon.textContent = '▶';
+    if (voicePlayBtnText) voicePlayBtnText.textContent = 'Play Voice';
+  }
+  if (btnVoiceUserPlayMini) {
+    btnVoiceUserPlayMini.textContent = '▶';
+  }
+  if (voiceRecStatus) voiceRecStatus.textContent = 'Paused';
+}
+
+function toggleVoicePlayback() {
+  if (isVoicePlaying) {
+    stopVoicePlayback();
+  } else {
+    startVoicePlayback();
+  }
+}
+
+function discardVoiceRecording() {
+  if (isVoiceRecording) stopVoiceRecording();
+  if (isVoicePlaying) stopVoicePlayback();
+
+  const clipKey = `${voiceActiveSurah}:${voiceActiveVerse}`;
+  if (currentVoiceUrl) URL.revokeObjectURL(currentVoiceUrl);
+  delete recordedClipsStore[clipKey];
+
+  currentVoiceBlob = null;
+  currentVoiceUrl = null;
+  voicePlaybackAudio.removeAttribute('src');
+
+  if (btnVoiceTogglePlay) {
+    btnVoiceTogglePlay.disabled = true;
+    btnVoiceTogglePlay.classList.remove('playing');
+    if (voicePlayIcon) voicePlayIcon.textContent = '▶';
+    if (voicePlayBtnText) voicePlayBtnText.textContent = 'Play Voice';
+  }
+  if (btnVoiceUserPlayMini) {
+    btnVoiceUserPlayMini.disabled = true;
+    btnVoiceUserPlayMini.textContent = '▶';
+  }
+  if (btnVoiceDiscard) btnVoiceDiscard.disabled = true;
+  if (memVoiceRecBtn) memVoiceRecBtn.classList.remove('has-voice');
+  if (voiceRecTimer) voiceRecTimer.textContent = '00:00';
+  if (voiceUserTimeDisplay) voiceUserTimeDisplay.textContent = '00:00';
+  if (voiceRecProgress) voiceRecProgress.style.width = '0%';
+  if (voiceRecStatus) voiceRecStatus.textContent = 'Voice Recitation';
+
+  showToastNotification('Recording cleared');
+}
+
+// Hook playback audio events
+voicePlaybackAudio.ontimeupdate = () => {
+  if (!voicePlaybackAudio.duration || isNaN(voicePlaybackAudio.duration)) return;
+  const cur = voicePlaybackAudio.currentTime;
+  const dur = voicePlaybackAudio.duration;
+  const pct = (cur / dur) * 100;
+  if (voiceRecProgress) voiceRecProgress.style.width = `${pct}%`;
+  const timeStr = `${formatVoiceTime(cur)} / ${formatVoiceTime(dur)}`;
+  if (voiceRecTimer) voiceRecTimer.textContent = timeStr;
+  if (voiceUserTimeDisplay) voiceUserTimeDisplay.textContent = timeStr;
+};
+
+voicePlaybackAudio.onended = () => {
+  isVoicePlaying = false;
+  if (voiceRecDot) voiceRecDot.className = 'voice-rec-dot';
+  if (btnVoiceTogglePlay) {
+    btnVoiceTogglePlay.classList.remove('playing');
+    if (voicePlayIcon) voicePlayIcon.textContent = '▶';
+    if (voicePlayBtnText) voicePlayBtnText.textContent = 'Play Voice';
+  }
+  if (btnVoiceUserPlayMini) {
+    btnVoiceUserPlayMini.textContent = '▶';
+  }
+  if (voiceRecProgress) voiceRecProgress.style.width = '0%';
+  if (voiceRecStatus) voiceRecStatus.textContent = 'Recitation ready';
+  if (voiceUserTimeDisplay) {
+    voiceUserTimeDisplay.textContent = formatVoiceTime(voicePlaybackAudio.duration || 0);
+  }
+};
+
+// Seek user recording track click
+if (voiceRecPlaybackTrack) {
+  voiceRecPlaybackTrack.addEventListener('click', (e) => {
+    if (!voicePlaybackAudio || !voicePlaybackAudio.duration) return;
+    const rect = voiceRecPlaybackTrack.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    voicePlaybackAudio.currentTime = ratio * voicePlaybackAudio.duration;
+  });
+}
+
+// Seek Ayah audio (Qari) track click
+if (voiceRecQariTrack) {
+  voiceRecQariTrack.addEventListener('click', (e) => {
+    if (!audioPlayer || !audioPlayer.duration || isNaN(audioPlayer.duration)) return;
+    const rect = voiceRecQariTrack.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audioPlayer.currentTime = ratio * audioPlayer.duration;
+    syncAyahAudioBar();
+  });
+}
+
+// Mini Play Button for Ayah Audio
+if (btnVoiceQariPlayMini) {
+  btnVoiceQariPlayMini.addEventListener('click', () => {
+    if (!audioPlayer) return;
+    if (audioPlayer.paused) {
+      if (isVoicePlaying) stopVoicePlayback();
+      const verseIdx = Math.max(0, voiceActiveVerse - 1);
+      if (!audioPlayer.src || currentAudioIndex !== verseIdx) {
+        playAyah(verseIdx);
+      } else {
+        safePlay(audioPlayer);
+      }
+    } else {
+      audioPlayer.pause();
+    }
+  });
+}
+
+// Close Ayah Audio Row
+if (btnCloseAyahAudioBar) {
+  btnCloseAyahAudioBar.addEventListener('click', () => setAyahAudioInHud(false));
+}
+
+// Mini Play Button for My Voice
+if (btnVoiceUserPlayMini) {
+  btnVoiceUserPlayMini.addEventListener('click', toggleVoicePlayback);
+}
+
+// Sync audioPlayer events with Ayah Audio bar in HUD
+audioPlayer.addEventListener('timeupdate', syncAyahAudioBar);
+audioPlayer.addEventListener('loadedmetadata', syncAyahAudioBar);
+audioPlayer.addEventListener('play', () => {
+  if (btnVoiceQariPlayMini) {
+    btnVoiceQariPlayMini.textContent = '❚❚';
+    btnVoiceQariPlayMini.title = 'Pause Ayah Audio';
+  }
+  if (btnVoiceCompareQari) btnVoiceCompareQari.classList.add('playing');
+});
+audioPlayer.addEventListener('pause', () => {
+  if (btnVoiceQariPlayMini) {
+    btnVoiceQariPlayMini.textContent = '▶';
+    btnVoiceQariPlayMini.title = 'Play Ayah Audio';
+  }
+  if (btnVoiceCompareQari) btnVoiceCompareQari.classList.remove('playing');
+});
+audioPlayer.addEventListener('ended', () => {
+  if (btnVoiceQariPlayMini) {
+    btnVoiceQariPlayMini.textContent = '▶';
+    btnVoiceQariPlayMini.title = 'Play Ayah Audio';
+  }
+  if (btnVoiceCompareQari) btnVoiceCompareQari.classList.remove('playing');
+});
+
+// Wire buttons
+if (memVoiceRecBtn) memVoiceRecBtn.addEventListener('click', () => toggleVoiceRecorder());
+if (btnGradingVoiceRec) btnGradingVoiceRec.addEventListener('click', () => {
+  const vNum = surahData && surahData.verses[currentGradingVerseIndex] ? surahData.verses[currentGradingVerseIndex].verseNumber : 1;
+  toggleVoiceRecorder(vNum);
+});
+if (closeVoiceRecorderBtn) closeVoiceRecorderBtn.addEventListener('click', closeVoiceRecorder);
+if (btnVoiceToggleRecord) btnVoiceToggleRecord.addEventListener('click', toggleVoiceRecording);
+if (btnVoiceTogglePlay) btnVoiceTogglePlay.addEventListener('click', toggleVoicePlayback);
+if (btnVoiceCompareQari) btnVoiceCompareQari.addEventListener('click', toggleAyahAudioInHud);
+if (btnVoiceDiscard) btnVoiceDiscard.addEventListener('click', discardVoiceRecording);
 
 // Boot
 if (audioBarWrapper) {

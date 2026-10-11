@@ -186,9 +186,9 @@
           <span style="font-size:0.95rem; line-height:1;">⚡</span>
         </button>
 
-        <!-- 8. Whole Surah Recall Mode Toggle -->
-        <button type="button" class="mem-circle-btn" id="memToggleRecallBtn" title="Whole Surah Recall Mode (Test full recitation from memory with Ayah reveal & grading)">
-          <span style="font-size:0.95rem; line-height:1;">📖</span>
+        <!-- 8. Voice Recorder & Playback Toggle -->
+        <button type="button" class="mem-circle-btn" id="memVoiceRecBtn" title="Voice Recorder: Record your recitation and play it back">
+          <span style="font-size:0.95rem; line-height:1;">🎙️</span>
         </button>
       </div>
 
@@ -198,28 +198,75 @@
     </div>
   </div>
 
-  <!-- Whole Surah Recall Mode HUD Bar -->
-  <div class="recall-hud-container" id="recallHudContainer" style="display:none;">
-    <div class="recall-hud-card">
-      <div class="recall-hud-main">
-        <div class="recall-hud-info">
-          <div class="recall-title-row">
-            <span class="recall-badge">📖 Whole Surah Recall</span>
-            <span class="recall-stat-pill" id="recallStatsCounter">0/0 Ayahs Recalled</span>
-          </div>
-          <div class="recall-ayah-title" id="recallAyahTitle">Ayah 1 of 31</div>
+  <!-- Voice Recorder & Playback HUD -->
+  <div class="voice-recorder-hud" id="voiceRecorderHud" style="display:none;">
+    <div class="voice-recorder-card">
+      <div class="voice-rec-header">
+        <div class="voice-rec-status-wrap">
+          <span class="voice-rec-dot" id="voiceRecDot"></span>
+          <span class="voice-rec-status" id="voiceRecStatus">Voice Recitation</span>
+          <span class="voice-rec-timer" id="voiceRecTimer">00:00</span>
         </div>
-        <div class="recall-hud-controls">
-          <button type="button" class="recall-act-btn" id="btnRecallPrevAyah" title="Previous Ayah (Left Arrow)">‹</button>
-          <button type="button" class="recall-act-btn primary" id="btnRecallToggleAyah" title="Reveal or Hide Current Ayah (Spacebar)">👁 Reveal</button>
-          <button type="button" class="recall-act-btn" id="btnRecallNextAyah" title="Next Ayah (Right Arrow)">›</button>
-          <button type="button" class="recall-act-btn flag" id="btnRecallFlagMistake" title="Flag Mistake on Current Ayah (M)">🚩 Flag</button>
-          <button type="button" class="recall-act-btn grade" id="btnRecallGradeAyah" title="Grade Ayah FSRS (G)">🎓 Grade</button>
-          <button type="button" class="recall-act-btn exit" id="btnRecallExit" title="Exit Whole Surah Recall Mode">✕ Exit</button>
+        <div class="voice-rec-header-actions">
+          <span class="voice-rec-verse-badge" id="voiceRecVerseBadge">Ayah 1</span>
+          <button type="button" class="voice-rec-close-btn" id="closeVoiceRecorderBtn" title="Close Recorder">✕</button>
         </div>
       </div>
-      <div class="recall-progress-track">
-        <div class="recall-progress-fill" id="recallProgressBarFill" style="width: 0%;"></div>
+
+      <!-- AUDIO BAR 1: Ayah Audio (Qari) [Active when Ayah audio is ON] -->
+      <div class="voice-rec-audio-row qari-audio-row" id="voiceRecQariRow" style="display:none;">
+        <div class="voice-rec-row-header">
+          <span class="voice-rec-row-label">
+            <span class="rec-row-icon">🔊</span>
+            <span id="voiceRecQariLabel">Ayah Audio (Qari)</span>
+          </span>
+          <div class="voice-rec-row-meta">
+            <span class="voice-rec-row-time" id="voiceQariTimeDisplay">00:00 / 00:00</span>
+            <button type="button" class="voice-row-close-btn" id="btnCloseAyahAudioBar" title="Turn Ayah Audio Off">✕</button>
+          </div>
+        </div>
+        <div class="voice-rec-bar-container">
+          <button type="button" class="voice-mini-play-btn qari-mini-btn" id="btnVoiceQariPlayMini" title="Play / Pause Ayah Audio">▶</button>
+          <div class="voice-rec-playback-track qari-track" id="voiceRecQariTrack" title="Click to seek Ayah audio">
+            <div class="voice-rec-progress qari-progress" id="voiceRecQariProgress" style="width:0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIO BAR 2: My Recording (User Voice) -->
+      <div class="voice-rec-audio-row user-audio-row" id="voiceRecUserRow">
+        <div class="voice-rec-row-header" id="voiceRecUserHeader" style="display:none;">
+          <span class="voice-rec-row-label">
+            <span class="rec-row-icon">🎙️</span>
+            <span>My Recording</span>
+          </span>
+          <span class="voice-rec-row-time" id="voiceUserTimeDisplay">00:00</span>
+        </div>
+        <div class="voice-rec-bar-container">
+          <button type="button" class="voice-mini-play-btn user-mini-btn" id="btnVoiceUserPlayMini" title="Play / Pause My Voice" disabled>▶</button>
+          <div class="voice-rec-playback-track user-track" id="voiceRecPlaybackTrack" title="Click to seek recording">
+            <div class="voice-rec-progress user-progress" id="voiceRecProgress" style="width:0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="voice-rec-actions">
+        <button type="button" class="voice-btn voice-btn-record" id="btnVoiceToggleRecord" title="Start / Stop Recording">
+          <span class="voice-btn-icon" id="voiceRecIcon">🎙️</span>
+          <span id="voiceRecBtnText">Record</span>
+        </button>
+        <button type="button" class="voice-btn voice-btn-play" id="btnVoiceTogglePlay" title="Play Back My Recording" disabled>
+          <span class="voice-btn-icon" id="voicePlayIcon">▶</span>
+          <span id="voicePlayBtnText">Play Voice</span>
+        </button>
+        <button type="button" class="voice-btn voice-btn-qari" id="btnVoiceCompareQari" title="Toggle Ayah Audio (Qari)">
+          <span class="voice-btn-icon" id="voiceQariBtnIcon">🔊</span>
+          <span id="voiceQariBtnText">Ayah Audio</span>
+        </button>
+        <button type="button" class="voice-btn voice-btn-discard" id="btnVoiceDiscard" title="Discard / Re-record" disabled>
+          <span>↺</span>
+        </button>
       </div>
     </div>
   </div>
@@ -562,6 +609,7 @@
             <span class="c-ayah-counter" id="gradingAyahCounter">1/31</span>
             <button type="button" class="c-nav-btn" id="gradingNextAyahBtn" title="Next Ayah">›</button>
             <button type="button" class="c-nav-btn c-play-audio-btn" id="btnGradingPlayAudio" title="Play Ayah Audio">▶</button>
+            <button type="button" class="c-nav-btn c-voice-btn" id="btnGradingVoiceRec" title="Voice Recorder: Record your recitation">🎙️</button>
           </div>
         </div>
         <div class="compact-header-right">
@@ -856,16 +904,6 @@
         </span>
         <label class="toggle-switch">
           <input type="checkbox" id="toggleReviewMode" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
-      <div class="setting-toggle-row">
-        <span class="setting-toggle-label">
-          <span>📖</span> Whole Surah Recall Mode
-        </span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="toggleWholeSurahRecall" />
           <span class="toggle-slider"></span>
         </label>
       </div>
