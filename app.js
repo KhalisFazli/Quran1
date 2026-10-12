@@ -896,53 +896,74 @@ function formatMistakeTimestamp(ts) {
   return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
 }
 
-function openMistakeHistoryModal() {
-  if (mistakeHistoryModal) {
-    mistakeHistoryModal.style.display = 'flex';
+function openMistakeHistoryModal(e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+  const modal = document.getElementById('mistakeHistoryModal');
+  if (modal) {
+    modal.classList.add('show');
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+  try {
     renderMistakeHistoryModal();
+  } catch (err) {
+    console.error('Error rendering mistake history:', err);
   }
 }
 
-function closeMistakeHistoryModal() {
-  if (mistakeHistoryModal) {
-    mistakeHistoryModal.style.display = 'none';
+function closeMistakeHistoryModal(e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+  const modal = document.getElementById('mistakeHistoryModal');
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.setProperty('display', 'none', 'important');
   }
 }
 
 function renderMistakeHistoryModal() {
-  if (!mistakeHistoryModal) return;
+  const modal = document.getElementById('mistakeHistoryModal');
+  if (!modal) return;
+
+  const listEl = document.getElementById('mistakeHistoryList');
+  if (!listEl) return;
 
   // 1. Recurrence frequency map
   const mistakeFreqMap = {};
-  mistakeHistoryStore.forEach(e => {
-    if (e.action === 'marked') {
+  (mistakeHistoryStore || []).forEach(e => {
+    if (e && e.action === 'marked' && e.wordKey) {
       mistakeFreqMap[e.wordKey] = (mistakeFreqMap[e.wordKey] || 0) + 1;
     }
   });
 
   // 2. KPI metrics
   const activeKeys = Object.keys(memorizeMistakes || {});
-  const currentSurahMistakes = activeKeys.filter(k => k.startsWith(`${currentSurahNumber}:`)).length;
-  const uniqueWordsSet = new Set(mistakeHistoryStore.map(e => e.wordKey));
+  const currentSurahMistakes = activeKeys.filter(k => k && k.startsWith(`${currentSurahNumber}:`)).length;
+  const uniqueWordsSet = new Set((mistakeHistoryStore || []).filter(e => e && e.wordKey).map(e => e.wordKey));
 
-  if (kpiTotalMistakesRecorded) kpiTotalMistakesRecorded.textContent = mistakeHistoryStore.length;
-  if (kpiActiveMistakesCount) kpiActiveMistakesCount.textContent = activeKeys.length;
-  if (kpiCurrentSurahMistakesCount) kpiCurrentSurahMistakesCount.textContent = currentSurahMistakes;
-  if (kpiCurrentSurahLabel) kpiCurrentSurahLabel.textContent = `In Surah ${currentSurahNumber}`;
-  if (kpiUniqueWordsCount) kpiUniqueWordsCount.textContent = uniqueWordsSet.size;
+  const kpiTotal = document.getElementById('kpiTotalMistakesRecorded');
+  const kpiActive = document.getElementById('kpiActiveMistakesCount');
+  const kpiCurSurah = document.getElementById('kpiCurrentSurahMistakesCount');
+  const kpiCurLabel = document.getElementById('kpiCurrentSurahLabel');
+  const kpiUnique = document.getElementById('kpiUniqueWordsCount');
+
+  if (kpiTotal) kpiTotal.textContent = (mistakeHistoryStore || []).length;
+  if (kpiActive) kpiActive.textContent = activeKeys.length;
+  if (kpiCurSurah) kpiCurSurah.textContent = currentSurahMistakes;
+  if (kpiCurLabel) kpiCurLabel.textContent = `In Surah ${currentSurahNumber}`;
+  if (kpiUnique) kpiUnique.textContent = uniqueWordsSet.size;
 
   // 3. Filter entries
   const query = (currentMistakeSearch || '').trim().toLowerCase();
-  let list = mistakeHistoryStore.filter(entry => {
-    const isActive = Boolean(memorizeMistakes && memorizeMistakes[entry.wordKey]);
+  let list = (mistakeHistoryStore || []).filter(entry => {
+    if (!entry) return false;
+    const isActive = Boolean(memorizeMistakes && entry.wordKey && memorizeMistakes[entry.wordKey]);
     if (currentMistakeFilter === 'active' && !isActive) return false;
     if (currentMistakeFilter === 'current' && entry.surah !== currentSurahNumber) return false;
     if (currentMistakeFilter === 'cleared' && isActive && entry.action !== 'cleared') return false;
 
     if (query) {
-      const refStr = `${entry.surah}:${entry.verse}`;
+      const refStr = `${entry.surah || ''}:${entry.verse || ''}`;
       const surahNameMatch = (entry.surahName || '').toLowerCase().includes(query);
-      const refMatch = refStr.includes(query) || `${entry.surah}` === query;
+      const refMatch = refStr.includes(query) || String(entry.surah || '') === query;
       const transMatch = (entry.wordTrans || '').toLowerCase().includes(query);
       const translitMatch = (entry.wordTranslit || '').toLowerCase().includes(query);
       const arabicMatch = (entry.wordArabic || '').includes(query) || (entry.wordPlain || '').includes(query);
@@ -956,24 +977,22 @@ function renderMistakeHistoryModal() {
 
   // 4. Sort entries
   if (currentMistakeSort === 'oldest') {
-    list.sort((a, b) => a.timestamp - b.timestamp);
+    list.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
   } else if (currentMistakeSort === 'frequent') {
     list.sort((a, b) => {
-      const fa = mistakeFreqMap[a.wordKey] || 0;
-      const fb = mistakeFreqMap[b.wordKey] || 0;
+      const fa = (a && a.wordKey) ? (mistakeFreqMap[a.wordKey] || 0) : 0;
+      const fb = (b && b.wordKey) ? (mistakeFreqMap[b.wordKey] || 0) : 0;
       if (fb !== fa) return fb - fa;
-      return b.timestamp - a.timestamp;
+      return (b.timestamp || 0) - (a.timestamp || 0);
     });
   } else {
     // 'newest'
-    list.sort((a, b) => b.timestamp - a.timestamp);
+    list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   }
 
   // 5. Render to list
-  if (!mistakeHistoryList) return;
-
   if (list.length === 0) {
-    mistakeHistoryList.innerHTML = `
+    listEl.innerHTML = `
       <div class="mistake-empty-state">
         <div class="mistake-empty-icon">🎉</div>
         <div class="mistake-empty-title">No Mistakes Found</div>
@@ -989,12 +1008,13 @@ function renderMistakeHistoryModal() {
 
   let html = '';
   list.forEach(entry => {
-    const isActive = Boolean(memorizeMistakes && memorizeMistakes[entry.wordKey]);
+    if (!entry) return;
+    const isActive = Boolean(memorizeMistakes && entry.wordKey && memorizeMistakes[entry.wordKey]);
     const actionBadge = entry.action === 'marked'
       ? `<span class="m-badge badge-action-marked">🚩 Marked</span>`
       : `<span class="m-badge badge-action-cleared">✓ Cleared</span>`;
 
-    const recurCount = mistakeFreqMap[entry.wordKey] || 0;
+    const recurCount = (entry.wordKey && mistakeFreqMap[entry.wordKey]) || 0;
     const recurBadge = recurCount > 1
       ? `<span class="m-badge badge-recurrent" title="Marked as mistake ${recurCount} times">⚠️ Repeated ${recurCount}×</span>`
       : '';
@@ -1005,7 +1025,7 @@ function renderMistakeHistoryModal() {
           <div class="mistake-meta-left">
             ${actionBadge}
             ${recurBadge}
-            <span class="mistake-ref-tag">${escapeHtml(entry.surahName)} ${entry.surah}:${entry.verse} (Word #${entry.wordPos})</span>
+            <span class="mistake-ref-tag">${escapeHtml(entry.surahName || ('Surah ' + entry.surah))} ${entry.surah}:${entry.verse} (Word #${entry.wordPos})</span>
           </div>
           <span class="mistake-time-tag">${formatMistakeTimestamp(entry.timestamp)}</span>
         </div>
@@ -1030,7 +1050,7 @@ function renderMistakeHistoryModal() {
     `;
   });
 
-  mistakeHistoryList.innerHTML = html;
+  listEl.innerHTML = html;
 }
 
 function jumpToMistakeAyah(surahNum, verseNum, wordPos) {
@@ -1073,7 +1093,8 @@ function toggleMistakeFromHistory(surahNum, verseNum, wordPos) {
   renderMistakeHistoryModal();
 }
 
-function clearMistakeHistoryLog() {
+function clearMistakeHistoryLog(e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
   if (confirm('Are you sure you want to clear your entire mistake history log?')) {
     mistakeHistoryStore = [];
     saveMistakeHistory();
@@ -1082,7 +1103,8 @@ function clearMistakeHistoryLog() {
   }
 }
 
-function practiceMistakesFromHistory() {
+function practiceMistakesFromHistory(e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
   const activeKeys = Object.keys(memorizeMistakes || {});
   if (activeKeys.length === 0) {
     showToastNotification('No active mistakes flagged to practice!');
@@ -1093,7 +1115,7 @@ function practiceMistakesFromHistory() {
   if (!isMemorizeMode) toggleMemorizeMode();
   setReviewMode(true);
 
-  let targetKey = activeKeys.find(k => k.startsWith(`${currentSurahNumber}:`)) || activeKeys[0];
+  let targetKey = activeKeys.find(k => k && k.startsWith(`${currentSurahNumber}:`)) || activeKeys[0];
   const parts = targetKey.split(':');
   const s = parseInt(parts[0]);
   const v = parseInt(parts[1]);
@@ -1105,6 +1127,8 @@ function practiceMistakesFromHistory() {
 
 window.openMistakeHistoryModal = openMistakeHistoryModal;
 window.closeMistakeHistoryModal = closeMistakeHistoryModal;
+window.clearMistakeHistoryLog = clearMistakeHistoryLog;
+window.practiceMistakesFromHistory = practiceMistakesFromHistory;
 window.jumpToMistakeAyah = jumpToMistakeAyah;
 window.toggleMistakeFromHistory = toggleMistakeFromHistory;
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v1.0.0/dist/font-face.css" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=2.1" />
+  <link rel="stylesheet" href="style.css?v=2.2" />
 </head>
 <body>
 
@@ -125,7 +125,7 @@
           <button type="button" class="lib-chip" data-filter="notes">📝 Notes</button>
           <button type="button" class="lib-chip" data-filter="meccan">Meccan</button>
           <button type="button" class="lib-chip" data-filter="medinan">Medinan</button>
-          <button type="button" class="lib-chip lib-btn-history" id="btnLibOpenMistakeHistory" style="background:#fef2f2; border-color:#fecaca; color:#b91c1c; font-weight:700;">📜 Mistake History</button>
+          <button type="button" class="lib-chip lib-btn-history" id="btnLibOpenMistakeHistory" onclick="openMistakeHistoryModal(event)" style="background:#fef2f2; border-color:#fecaca; color:#b91c1c; font-weight:700;">📜 Mistake History</button>
         </div>
       </div>
 
@@ -397,7 +397,7 @@
           <span>Select Multiple Words...</span>
         </div>
       </div>
-      <div class="ctx-item" id="ctxItemMistakeHistory" title="View Mistake History Log">
+      <div class="ctx-item" id="ctxItemMistakeHistory" onclick="openMistakeHistoryModal(event)" title="View Mistake History Log">
         <div class="ctx-item-left">
           <span style="font-size:0.95rem;">📜</span>
           <span>Mistake History</span>
@@ -493,7 +493,7 @@
         <span id="ayahCtxNoteLabel">Add / Edit Note</span>
       </div>
     </div>
-    <div class="ctx-item" id="ayahCtxMistakeHistory" title="View Mistake History Log">
+    <div class="ctx-item" id="ayahCtxMistakeHistory" onclick="openMistakeHistoryModal(event)" title="View Mistake History Log">
       <div class="ctx-item-left">
         <span style="font-size:0.95rem;">📜</span>
         <span>Mistake History</span>
@@ -538,7 +538,7 @@
             <span class="mistake-history-sub" id="mistakeHistorySub">Track flagged mistakes, recurrence frequency, and review</span>
           </div>
         </div>
-        <button type="button" class="mistake-history-close" id="btnCloseMistakeHistoryModal" title="Close">✕</button>
+        <button type="button" class="mistake-history-close" id="btnCloseMistakeHistoryModal" onclick="closeMistakeHistoryModal(event)" title="Close">✕</button>
       </div>
 
       <!-- KPI Stats Summary Row -->
@@ -595,14 +595,14 @@
 
       <!-- Footer Actions -->
       <div class="mistake-history-footer">
-        <button type="button" class="btn-clear-history-log" id="btnClearMistakeHistoryLog" title="Clear mistake history log">
+        <button type="button" class="btn-clear-history-log" id="btnClearMistakeHistoryLog" onclick="clearMistakeHistoryLog(event)" title="Clear mistake history log">
           🗑️ Clear History Log
         </button>
         <div style="flex:1;"></div>
-        <button type="button" class="btn-practice-mistakes" id="btnPracticeMistakes" title="Practice troublesome ayahs">
+        <button type="button" class="btn-practice-mistakes" id="btnPracticeMistakes" onclick="practiceMistakesFromHistory(event)" title="Practice troublesome ayahs">
           ⚡ Practice Troubled Ayahs
         </button>
-        <button type="button" class="btn-close-mistake-history" id="btnCloseMistakeHistoryFooter">
+        <button type="button" class="btn-close-mistake-history" id="btnCloseMistakeHistoryFooter" onclick="closeMistakeHistoryModal(event)">
           Close
         </button>
       </div>
@@ -1200,7 +1200,7 @@
       </div>
 
       <div class="setting-action-row" style="margin-top:6px;">
-        <button type="button" class="setting-action-btn" id="btnOpenMistakeHistoryDrawer" style="width:100%; background:#fef2f2; border-color:#fecaca; color:#b91c1c; font-weight:600;">
+        <button type="button" class="setting-action-btn" id="btnOpenMistakeHistoryDrawer" onclick="if(typeof closeSettings==='function')closeSettings(); openMistakeHistoryModal(event);" style="width:100%; background:#fef2f2; border-color:#fecaca; color:#b91c1c; font-weight:600;">
           📜 View Mistake History
         </button>
       </div>
@@ -1285,6 +1285,6 @@
   <audio id="audioPlayer"></audio>
 
   <!-- External JavaScript Engine -->
-  <script src="app.js?v=2.1" defer></script>
+  <script src="app.js?v=2.2" defer></script>
 </body>
 </html>
