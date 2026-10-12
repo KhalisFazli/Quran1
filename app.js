@@ -4950,6 +4950,76 @@ function saveFsrsCards() {
   }
 }
 
+// Anki-Style Append-Only Review Log (revlog) Storage
+const FSRS_REVLOG_STORAGE_KEY = 'quran_fsrs_revlog_store';
+
+function loadFsrsRevlog() {
+  try {
+    const raw = localStorage.getItem(FSRS_REVLOG_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveFsrsRevlog() {
+  try {
+    localStorage.setItem(FSRS_REVLOG_STORAGE_KEY, JSON.stringify(fsrsRevlogStore));
+  } catch (e) {
+    console.warn('Failed to save FSRS revlog:', e);
+  }
+}
+
+let fsrsRevlogStore = loadFsrsRevlog();
+
+function appendFsrsRevlog(card, rating, scheduledDays, now = new Date()) {
+  if (!card) return null;
+  const revId = `${now.getTime()}-${Math.random().toString(36).substring(2, 8)}`;
+  const entry = {
+    id: revId,
+    cid: `${card.surahNumber}:${card.verseNumber}`,
+    surah: card.surahNumber,
+    verse: card.verseNumber,
+    rating: rating,
+    state: card.state,
+    stability: card.stability,
+    difficulty: card.difficulty,
+    scheduledDays: scheduledDays,
+    elapsedDays: card.elapsed_days || 0,
+    due: card.due,
+    timestamp: now.toISOString()
+  };
+  fsrsRevlogStore.push(entry);
+  saveFsrsRevlog();
+  return entry;
+}
+
+function bootstrapRevlogFromExistingCards() {
+  if (fsrsRevlogStore.length === 0 && fsrsCardStore) {
+    Object.values(fsrsCardStore).forEach(c => {
+      if (c && c.reps > 0 && c.last_review) {
+        fsrsRevlogStore.push({
+          id: `init-${c.surahNumber}:${c.verseNumber}-${new Date(c.last_review).getTime()}`,
+          cid: `${c.surahNumber}:${c.verseNumber}`,
+          surah: c.surahNumber,
+          verse: c.verseNumber,
+          rating: c.last_rating || 3,
+          state: c.state,
+          stability: c.stability,
+          difficulty: c.difficulty,
+          scheduledDays: c.scheduled_days || 1,
+          elapsedDays: c.elapsed_days || 0,
+          due: c.due,
+          timestamp: c.last_review
+        });
+      }
+    });
+    if (fsrsRevlogStore.length > 0) {
+      saveFsrsRevlog();
+    }
+  }
+}
+
 function getAyahCardKey(surahNum, verseNum) {
   return `${surahNum}:${verseNum}`;
 }
@@ -5087,6 +5157,10 @@ function scheduleFsrsReview(card, rating, now = new Date()) {
   card.due = dueTime.toISOString();
 
   saveFsrsCards();
+  appendFsrsRevlog(card, rating, scheduledDays, now);
+  if (typeof scheduleGdriveAutoSync === 'function') {
+    scheduleGdriveAutoSync();
+  }
   return card;
 }
 
@@ -5852,11 +5926,148 @@ function showSyncStatus(msg, type = 'info') {
   }, 5000);
 }
 
+// Anki-Style Append-Only Revlog Conflict-Free Merge Engine
+function mergeAnkiRevlogs(remotePayload) {
+  if (!remotePayload) return { newReviewsAdded: 0 };
+
+  // 1. Merge Revlog (Append-only by unique entry id)
+  const remoteRevlog = Array.isArray(remotePayload.revlog) ? remotePayload.revlog : [];
+  const logMap = new Map();
+  (fsrsRevlogStore || []).forEach(r => {
+    if (r && r.id) logMap.set(r.id, r);
+  });
+  let newReviewsAdded = 0;
+  remoteRevlog.forEach(r => {
+    if (r && r.id && !logMap.has(r.id)) {
+      logMap.set(r.id, r);
+      newReviewsAdded++;
+    }
+  });
+  // Sort chronologically ascending
+  fsrsRevlogStore = Array.from(logMap.values()).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  saveFsrsRevlog();
+
+  // 2. Reconcile Card Store based on latest reviews from merged revlog
+  const cardLatestReview = new Map();
+  const cardRepCounts = new Map();
+  fsrsRevlogStore.forEach(r => {
+    const key = r.cid || `${r.surah}:${r.verse}`;
+    cardRepCounts.set(key, (cardRepCounts.get(key) || 0) + 1);
+    const existing = cardLatestReview.get(key);
+    if (!existing || new Date(r.timestamp) >= new Date(existing.timestamp)) {
+      cardLatestReview.set(key, r);
+    }
+  });
+
+  // Also import any remote cards if not present locally
+  if (remotePayload.fsrsCards && typeof remotePayload.fsrsCards === 'object') {
+    Object.keys(remotePayload.fsrsCards).forEach(key => {
+      if (!fsrsCardStore[key]) {
+        fsrsCardStore[key] = remotePayload.fsrsCards[key];
+      }
+    });
+  }
+
+  // Update cards according to latest review
+  cardLatestReview.forEach((latestRev, key) => {
+    const parts = key.split(':');
+    const sNum = parseInt(parts[0]);
+    const vNum = parseInt(parts[1]);
+    const card = fsrsCardStore[key] || getOrCreateAyahCard(sNum, vNum);
+    const cardLastTime = card.last_review ? new Date(card.last_review).getTime() : 0;
+    const revTime = new Date(latestRev.timestamp).getTime();
+    if (revTime >= cardLastTime) {
+      card.state = latestRev.state;
+      card.stability = latestRev.stability;
+      card.difficulty = latestRev.difficulty;
+      card.scheduled_days = latestRev.scheduledDays;
+      card.last_review = latestRev.timestamp;
+      card.last_rating = latestRev.rating;
+      card.due = latestRev.due;
+    }
+    card.reps = Math.max(card.reps || 0, cardRepCounts.get(key) || 0);
+    fsrsCardStore[key] = card;
+  });
+  saveFsrsCards();
+
+  // 3. Merge Mistakes
+  if (remotePayload.mistakes && typeof remotePayload.mistakes === 'object') {
+    Object.assign(memorizeMistakes, remotePayload.mistakes);
+    saveMistakes(memorizeMistakes);
+  }
+  if (Array.isArray(remotePayload.mistakeHistory)) {
+    const histMap = new Map();
+    mistakeHistoryStore.forEach(h => histMap.set(h.id || (h.wordKey + '-' + h.timestamp), h));
+    remotePayload.mistakeHistory.forEach(h => {
+      const hId = h.id || (h.wordKey + '-' + h.timestamp);
+      if (!histMap.has(hId)) histMap.set(hId, h);
+    });
+    mistakeHistoryStore = Array.from(histMap.values())
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 500);
+    saveMistakeHistory();
+  }
+
+  // 4. Merge Notes (Last-write-wins based on updatedAt timestamp)
+  if (remotePayload.notes && typeof remotePayload.notes === 'object') {
+    Object.keys(remotePayload.notes).forEach(k => {
+      const remoteNote = remotePayload.notes[k];
+      const localNote = ayahNotesStore[k];
+      if (!localNote) {
+        ayahNotesStore[k] = remoteNote;
+      } else if (typeof remoteNote === 'object' && remoteNote.updatedAt) {
+        const remoteTime = new Date(remoteNote.updatedAt).getTime();
+        const localTime = (typeof localNote === 'object' && localNote.updatedAt) ? new Date(localNote.updatedAt).getTime() : 0;
+        if (remoteTime > localTime) {
+          ayahNotesStore[k] = remoteNote;
+        }
+      } else if (!localNote) {
+        ayahNotesStore[k] = remoteNote;
+      }
+    });
+    saveAyahNotesStore();
+  }
+
+  // 5. Merge Overrides
+  if (remotePayload.wordVisOverrides) {
+    Object.assign(wordVisOverrides, remotePayload.wordVisOverrides);
+    saveWordVisOverrides(wordVisOverrides);
+  }
+  if (remotePayload.ayahVisOverrides) {
+    Object.assign(ayahVisOverrides, remotePayload.ayahVisOverrides);
+    saveAyahVisOverrides(ayahVisOverrides);
+  }
+
+  // 6. Settings
+  if (remotePayload.wordPopupTrigger) {
+    wordPopupTrigger = remotePayload.wordPopupTrigger;
+    localStorage.setItem(POPUP_TRIGGER_KEY, wordPopupTrigger);
+    if (togglePopupTap) togglePopupTap.checked = (wordPopupTrigger === 'tap');
+  }
+  if (typeof remotePayload.fsrsNotifications === 'boolean') {
+    setFsrsNotificationsEnabled(remotePayload.fsrsNotifications);
+    if (toggleFsrsNotifications) toggleFsrsNotifications.checked = remotePayload.fsrsNotifications;
+  }
+
+  // Update UI components
+  updateWordElementsMistakeClasses();
+  updateActiveMistakeButtonState();
+  updateMemorizeOverridesStats();
+  updateFsrsBadgeAndNotifications(false);
+  updateTopSurahDueBadge();
+  renderSurahDropdown();
+  if (isMemorizeMode) {
+    applyMemorizeState(true);
+  }
+  return { newReviewsAdded };
+}
+
 function generateSyncPayload() {
   return {
     app: 'QuranMemFSRS',
-    version: '1.0',
+    version: '2.0',
     exportDate: new Date().toISOString(),
+    revlog: fsrsRevlogStore || [],
     fsrsCards: fsrsCardStore || {},
     mistakes: memorizeMistakes || {},
     mistakeHistory: mistakeHistoryStore || [],
@@ -5936,8 +6147,12 @@ function importSyncData(inputData) {
 
     let cardCount = 0;
 
-    // Mode 1: Compact QR Code payload (q === 1)
-    if (data.q === 1 && data.c && typeof data.c === 'object') {
+    // Mode 0: Anki Append-Only Revlog (Conflict-Free Merge)
+    if (data.revlog && Array.isArray(data.revlog)) {
+      mergeAnkiRevlogs(data);
+      cardCount = Object.keys(fsrsCardStore).length;
+    } else if (data.q === 1 && data.c && typeof data.c === 'object') {
+      // Mode 1: Compact QR Code payload (q === 1)
       Object.keys(data.c).forEach(key => {
         const [state, stability, difficulty, reps, lapses, dueSec, lastRating] = data.c[key];
         const parts = key.split(':');
@@ -6126,6 +6341,335 @@ if (btnImportSyncTrigger && fileSyncInput) {
 }
 if (btnCopySyncClipboard) btnCopySyncClipboard.addEventListener('click', copySyncToClipboard);
 if (btnPasteSyncClipboard) btnPasteSyncClipboard.addEventListener('click', pasteSyncFromClipboard);
+
+// =========================================================
+// GOOGLE DRIVE SYNC ENGINE (AppData Folder & Anki Revlog)
+// =========================================================
+
+const GDRIVE_CLIENT_ID_KEY = 'quran_gdrive_client_id';
+const GDRIVE_ACCESS_TOKEN_KEY = 'quran_gdrive_access_token';
+const GDRIVE_TOKEN_EXP_KEY = 'quran_gdrive_token_exp';
+const GDRIVE_LAST_SYNC_KEY = 'quran_gdrive_last_sync';
+const GDRIVE_FILE_NAME = 'quran_mem_sync_revlog.json';
+
+let gdriveTokenClient = null;
+let isGdriveSyncing = false;
+let gdriveAutoSyncTimer = null;
+
+function getGdriveClientId() {
+  return localStorage.getItem(GDRIVE_CLIENT_ID_KEY) || '';
+}
+
+function setGdriveClientId(id) {
+  if (id) {
+    localStorage.setItem(GDRIVE_CLIENT_ID_KEY, id.trim());
+  } else {
+    localStorage.removeItem(GDRIVE_CLIENT_ID_KEY);
+  }
+}
+
+function getGdriveAccessToken() {
+  const token = localStorage.getItem(GDRIVE_ACCESS_TOKEN_KEY);
+  const exp = parseInt(localStorage.getItem(GDRIVE_TOKEN_EXP_KEY) || '0');
+  if (!token) return null;
+  if (Date.now() >= exp - 60000) {
+    return null;
+  }
+  return token;
+}
+
+function saveGdriveToken(token, expiresInSec = 3600) {
+  localStorage.setItem(GDRIVE_ACCESS_TOKEN_KEY, token);
+  localStorage.setItem(GDRIVE_TOKEN_EXP_KEY, (Date.now() + expiresInSec * 1000).toString());
+}
+
+function clearGdriveToken() {
+  localStorage.removeItem(GDRIVE_ACCESS_TOKEN_KEY);
+  localStorage.removeItem(GDRIVE_TOKEN_EXP_KEY);
+}
+
+function isGdriveConnected() {
+  return !!getGdriveAccessToken();
+}
+
+function formatGdriveRelativeTime(isoString) {
+  if (!isoString) return 'Never';
+  const diffSec = Math.round((Date.now() - new Date(isoString).getTime()) / 1000);
+  if (diffSec < 15) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDays = Math.round(diffHr / 24);
+  return `${diffDays}d ago`;
+}
+
+function updateGdriveUi(isConnected, syncing = false, message = null) {
+  const statusDot = document.getElementById('gdriveStatusDot');
+  const statusText = document.getElementById('gdriveStatusText');
+  const authBtn = document.getElementById('btnGdriveAuth');
+  const authLabel = document.getElementById('btnGdriveAuthLabel');
+  const syncActions = document.getElementById('gdriveSyncActions');
+  const syncMeta = document.getElementById('gdriveSyncMeta');
+  const inputClientId = document.getElementById('inputGdriveClientId');
+
+  if (inputClientId && !inputClientId.value) {
+    inputClientId.value = getGdriveClientId();
+  }
+
+  if (syncing) {
+    if (statusDot) statusDot.className = 'gdrive-status-dot syncing';
+    if (statusText) statusText.textContent = message || 'Syncing with Google Drive...';
+    return;
+  }
+
+  const lastSyncIso = localStorage.getItem(GDRIVE_LAST_SYNC_KEY);
+  const logCount = fsrsRevlogStore ? fsrsRevlogStore.length : 0;
+
+  if (isConnected) {
+    if (statusDot) statusDot.className = 'gdrive-status-dot connected';
+    if (statusText) statusText.textContent = 'Connected to Google Drive';
+    if (authBtn) authBtn.classList.add('connected');
+    if (authLabel) authLabel.textContent = 'Connected ✓';
+    if (syncActions) syncActions.style.display = 'block';
+    if (syncMeta) {
+      syncMeta.textContent = `Last synced: ${formatGdriveRelativeTime(lastSyncIso)} • ${logCount} review(s) in Anki log`;
+    }
+  } else {
+    if (statusDot) statusDot.className = 'gdrive-status-dot';
+    if (statusText) statusText.textContent = message || 'Disconnected';
+    if (authBtn) authBtn.classList.remove('connected');
+    if (authLabel) authLabel.textContent = 'Connect Drive';
+    if (syncActions) syncActions.style.display = 'none';
+  }
+}
+
+function initGdriveSync() {
+  const inputClientId = document.getElementById('inputGdriveClientId');
+  const btnSaveClientId = document.getElementById('btnSaveGdriveClientId');
+  const btnHelp = document.getElementById('btnGdriveHelp');
+  const helpBox = document.getElementById('gdriveHelpBox');
+  const authBtn = document.getElementById('btnGdriveAuth');
+  const btnSyncNow = document.getElementById('btnGdriveSyncNow');
+  const btnDisconnect = document.getElementById('btnGdriveDisconnect');
+
+  if (inputClientId) inputClientId.value = getGdriveClientId();
+
+  if (btnSaveClientId && inputClientId) {
+    btnSaveClientId.addEventListener('click', () => {
+      const val = inputClientId.value.trim();
+      setGdriveClientId(val);
+      showSyncStatus(val ? '✓ Saved Google Client ID' : 'Client ID cleared', 'success');
+      showToastNotification('Google OAuth Client ID saved');
+    });
+  }
+
+  if (btnHelp && helpBox) {
+    btnHelp.addEventListener('click', () => {
+      helpBox.style.display = (helpBox.style.display === 'none' || !helpBox.style.display) ? 'block' : 'none';
+    });
+  }
+
+  if (authBtn) {
+    authBtn.addEventListener('click', () => {
+      if (isGdriveConnected()) {
+        syncWithGoogleDrive(false);
+      } else {
+        requestGdriveAuth();
+      }
+    });
+  }
+
+  if (btnSyncNow) {
+    btnSyncNow.addEventListener('click', () => syncWithGoogleDrive(false));
+  }
+
+  if (btnDisconnect) {
+    btnDisconnect.addEventListener('click', disconnectGdrive);
+  }
+
+  updateGdriveUi(isGdriveConnected());
+
+  if (isGdriveConnected()) {
+    setTimeout(() => syncWithGoogleDrive(true), 3000);
+  }
+}
+
+function requestGdriveAuth() {
+  const clientId = getGdriveClientId();
+  if (!clientId) {
+    const details = document.getElementById('gdriveConfigDetails');
+    const input = document.getElementById('inputGdriveClientId');
+    if (details) details.open = true;
+    if (input) {
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    showToastNotification('Please paste your Google OAuth Client ID in settings');
+    return;
+  }
+
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+    showToastNotification('Google Identity Service is loading, please try again in a moment...');
+    return;
+  }
+
+  try {
+    gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.appdata',
+      callback: (resp) => {
+        if (resp.error) {
+          console.error('Google Auth Error:', resp);
+          showToastNotification(`Google Auth Error: ${resp.error}`);
+          updateGdriveUi(false, false, 'Auth failed');
+          return;
+        }
+        if (resp.access_token) {
+          saveGdriveToken(resp.access_token, resp.expires_in || 3600);
+          updateGdriveUi(true);
+          showToastNotification('✓ Connected to Google Drive!');
+          syncWithGoogleDrive(false);
+        }
+      }
+    });
+
+    gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+  } catch (err) {
+    console.error('Error starting Google Auth:', err);
+    showToastNotification('Failed to open Google Sign-In prompt. Check Client ID.');
+  }
+}
+
+function disconnectGdrive() {
+  const token = getGdriveAccessToken();
+  if (token && typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+    try {
+      google.accounts.oauth2.revoke(token, () => {});
+    } catch (e) {}
+  }
+  clearGdriveToken();
+  updateGdriveUi(false);
+  showToastNotification('Disconnected from Google Drive');
+  showSyncStatus('Disconnected from Google Drive', 'info');
+}
+
+async function syncWithGoogleDrive(isSilent = false) {
+  if (isGdriveSyncing) return;
+  const token = getGdriveAccessToken();
+  if (!token) {
+    if (!isSilent) {
+      requestGdriveAuth();
+    }
+    return;
+  }
+
+  isGdriveSyncing = true;
+  updateGdriveUi(true, true);
+  if (!isSilent) showToastNotification('🔄 Syncing with Google Drive...');
+
+  try {
+    const searchUrl = 'https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name=%27' + encodeURIComponent(GDRIVE_FILE_NAME) + '%27+and+trashed=false&fields=files(id,name,modifiedTime)';
+    const searchRes = await fetch(searchUrl, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (searchRes.status === 401) {
+      clearGdriveToken();
+      updateGdriveUi(false, false, 'Session expired. Reconnect.');
+      if (!isSilent) showToastNotification('Google session expired. Please reconnect.');
+      isGdriveSyncing = false;
+      return;
+    }
+
+    const searchData = await searchRes.json();
+    let fileId = null;
+    let remotePayload = null;
+
+    if (searchData.files && searchData.files.length > 0) {
+      fileId = searchData.files[0].id;
+      const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (downloadRes.ok) {
+        remotePayload = await downloadRes.json();
+      }
+    }
+
+    let mergeStats = { newReviewsAdded: 0 };
+    if (remotePayload) {
+      mergeStats = mergeAnkiRevlogs(remotePayload);
+    }
+
+    const unifiedPayload = {
+      ...generateSyncPayload(),
+      revlog: fsrsRevlogStore,
+      syncClient: 'web',
+      syncTimestamp: new Date().toISOString()
+    };
+    const jsonStr = JSON.stringify(unifiedPayload);
+
+    if (fileId) {
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: jsonStr
+      });
+    } else {
+      const metadata = {
+        name: GDRIVE_FILE_NAME,
+        parents: ['appDataFolder']
+      };
+      const boundary = 'foo_bar_baz_quran';
+      const multipartBody =
+        `--${boundary}\r\n` +
+        `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\n` +
+        `Content-Type: application/json\r\n\r\n` +
+        `${jsonStr}\r\n` +
+        `--${boundary}--`;
+
+      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body: multipartBody
+      });
+    }
+
+    const nowIso = new Date().toISOString();
+    localStorage.setItem(GDRIVE_LAST_SYNC_KEY, nowIso);
+    updateGdriveUi(true, false);
+
+    const logCount = fsrsRevlogStore.length;
+    const msg = `✓ Google Drive synced! (${logCount} revlog entries${mergeStats.newReviewsAdded > 0 ? `, +${mergeStats.newReviewsAdded} new` : ''})`;
+    showSyncStatus(msg, 'success');
+    if (!isSilent) showToastNotification(msg);
+
+  } catch (err) {
+    console.error('Google Drive sync error:', err);
+    updateGdriveUi(true, false);
+    showSyncStatus('✕ Google Drive sync error', 'error');
+    if (!isSilent) showToastNotification('✕ Google Drive sync failed. Check connection.');
+  } finally {
+    isGdriveSyncing = false;
+  }
+}
+
+function scheduleGdriveAutoSync() {
+  if (!isGdriveConnected()) return;
+  if (gdriveAutoSyncTimer) clearTimeout(gdriveAutoSyncTimer);
+  gdriveAutoSyncTimer = setTimeout(() => {
+    syncWithGoogleDrive(true);
+  }, 10000);
+}
 
 function checkUrlHashSync() {
   if (window.location.hash && window.location.hash.startsWith('#sync=')) {
@@ -6815,6 +7359,8 @@ if (initReciterSelect) {
 initChapters();
 initMistakeHistory();
 initAyahNotes();
+bootstrapRevlogFromExistingCards();
+initGdriveSync();
 checkUrlHashSync();
 showLibraryView();
 loadSurah(76).then(() => {
