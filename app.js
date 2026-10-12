@@ -60,6 +60,8 @@ let isAutoRevealing = false;
 let autoRevealInterval = null;
 let autoRevealSpeed = 1.0;
 let isGradeMode = false;
+let isGradeModalFromReveal = false;
+let promptedGradeAyahs = new Set();
 let isMistakeMode = false;
 let isReviewMode = false;
 let activeAyahContextVerse = 1;
@@ -387,6 +389,7 @@ const fsrsNotifMsg = document.getElementById('fsrsNotifMsg');
 const fsrsNotifReviewBtn = document.getElementById('fsrsNotifReviewBtn');
 const fsrsNotifCloseBtn = document.getElementById('fsrsNotifCloseBtn');
 const toggleFsrsNotifications = document.getElementById('toggleFsrsNotifications');
+const toggleGradeRevealMode = document.getElementById('toggleGradeRevealMode');
 const btnTestFsrsNotification = document.getElementById('btnTestFsrsNotification');
 
 // Settings Elements
@@ -560,8 +563,18 @@ function getRosetteSvg(number) {
   if (ayahOverride === 'visible') overrideClass = 'ayah-persist-visible';
   else if (ayahOverride === 'hidden') overrideClass = 'ayah-persist-hidden';
 
+  let isLastWordRevealed = false;
+  if (surahData && surahData.verses && surahData.verses[number - 1]) {
+    const v = surahData.verses[number - 1];
+    if (totalWordElements && totalWordElements[v.endWordIdx]) {
+      isLastWordRevealed = !totalWordElements[v.endWordIdx].classList.contains('memorize-hidden');
+    } else {
+      isLastWordRevealed = (revealedWordCount > v.endWordIdx);
+    }
+  }
+
   const isHidden = (ayahOverride === 'hidden') || 
-    (!ayahOverride && !isAyahNumberAlwaysVisible && isMemorizeMode && (number !== currentMemorizeAyah));
+    (!ayahOverride && !isAyahNumberAlwaysVisible && isMemorizeMode && !isLastWordRevealed);
   const lenClass = number >= 100 ? 'digits-3' : '';
   const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
   const noteIndicator = hasNote ? `<span class="ayah-note-indicator" title="Has Reflection / Note">📝</span>` : '';
@@ -1670,6 +1683,7 @@ async function initChapters() {
 async function loadSurah(num) {
   currentSurahNumber = num;
   isVbvRenderedForCurrentSurah = false;
+  promptedGradeAyahs.clear();
   const cacheKey = `${num}_${selectedReciter}`;
 
   if (surahCache.has(cacheKey)) {
@@ -2195,10 +2209,19 @@ function applyIncrementalMemorize(oldCount, newCount) {
 
   updateAyahMarkersVisibility();
   updateActiveMistakeButtonState();
+
+  if (promptedGradeAyahs.size > 0 && newCount < oldCount) {
+    promptedGradeAyahs.forEach(vNum => {
+      if (!isAyahFullyRevealed(vNum)) promptedGradeAyahs.delete(vNum);
+    });
+  }
 }
 
 function applyMemorizeState(fullReset = false) {
   if (!isMemorizeMode) return;
+  if (fullReset) {
+    promptedGradeAyahs.clear();
+  }
   totalWordElements.forEach((wordEl, idx) => {
     wordEl.classList.remove('mem-active-focus');
     applyWordMemorizeVisibility(wordEl, idx, revealedWordCount);
@@ -2239,22 +2262,14 @@ function updateAyahMarkersVisibility() {
         }
 
         // When in memorize mode and toggle ayah number is set to hidden:
-        let allWordsRevealed = (revealedWordCount > v.endWordIdx);
-        if (!allWordsRevealed && totalWordElements && totalWordElements.length) {
-          let hasHidden = false;
-          for (let i = v.startWordIdx; i <= v.endWordIdx; i++) {
-            const el = totalWordElements[i];
-            if (el && el.classList.contains('memorize-hidden')) {
-              hasHidden = true;
-              break;
-            }
-          }
-          if (!hasHidden) allWordsRevealed = true;
+        let isLastWordRevealed = false;
+        if (totalWordElements && totalWordElements[v.endWordIdx]) {
+          isLastWordRevealed = !totalWordElements[v.endWordIdx].classList.contains('memorize-hidden');
+        } else {
+          isLastWordRevealed = (revealedWordCount > v.endWordIdx);
         }
 
-        const isActiveAyah = (v.verseNumber === currentMemorizeAyah);
-
-        if (allWordsRevealed || isActiveAyah) {
+        if (isLastWordRevealed) {
           marker.classList.remove('hidden-ayah');
         } else {
           marker.classList.add('hidden-ayah');
@@ -2262,6 +2277,43 @@ function updateAyahMarkersVisibility() {
       }
     });
   });
+}
+
+function isAyahFullyRevealed(verseNum) {
+  if (!surahData || !surahData.verses) return false;
+  const verse = surahData.verses[verseNum - 1];
+  if (!verse) return false;
+
+  if (!totalWordElements || totalWordElements.length === 0) {
+    return revealedWordCount > verse.endWordIdx;
+  }
+
+  for (let i = verse.startWordIdx; i <= verse.endWordIdx; i++) {
+    const el = totalWordElements[i];
+    if (el && el.classList.contains('memorize-hidden')) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function triggerGradeRevealForAyah(verseNum) {
+  if (!isMemorizeMode || !isGradeMode) return;
+  if (!surahData || !surahData.verses || !surahData.verses[verseNum - 1]) return;
+  if (promptedGradeAyahs.has(verseNum)) return;
+  if (ayahGradingOverlay && ayahGradingOverlay.classList.contains('show')) return;
+
+  promptedGradeAyahs.add(verseNum);
+  if (isAutoRevealing) {
+    stopAutoReveal();
+  }
+
+  setTimeout(() => {
+    if (isMemorizeMode && isGradeMode && isAyahFullyRevealed(verseNum)) {
+      isGradeModalFromReveal = true;
+      openAyahGradingModal(currentSurahNumber, verseNum);
+    }
+  }, 180);
 }
 
 function revealWordAt(idx, isRapid = false) {
@@ -2279,6 +2331,13 @@ function revealWordAt(idx, isRapid = false) {
   revealedWordCount = Math.max(revealedWordCount, idx + 1);
   updateAyahMarkersVisibility();
   updateActiveMistakeButtonState();
+
+  if (isGradeMode) {
+    const vNum = parseInt(wordEl.getAttribute('data-verse-num'));
+    if (!isNaN(vNum) && isAyahFullyRevealed(vNum)) {
+      triggerGradeRevealForAyah(vNum);
+    }
+  }
 }
 
 function hideWordAt(idx, isRapid = false) {
@@ -2289,6 +2348,11 @@ function hideWordAt(idx, isRapid = false) {
     wordEl.classList.add('memorize-hidden');
   }
   wordEl.classList.remove('mem-active-focus');
+
+  const vNum = parseInt(wordEl.getAttribute('data-verse-num'));
+  if (!isNaN(vNum) && promptedGradeAyahs.has(vNum)) {
+    promptedGradeAyahs.delete(vNum);
+  }
 
   let prevRevealedEl = null;
   for (let i = idx - 1; i >= 0; i--) {
@@ -2821,6 +2885,10 @@ function hideAyahContextMenu() {
             revealedWordCount = Math.max(revealedWordCount, clickedIdx + 1);
             updateAyahMarkersVisibility();
             updateActiveMistakeButtonState();
+
+            if (isGradeMode && isAyahFullyRevealed(vNum)) {
+              triggerGradeRevealForAyah(vNum);
+            }
           }
         } else {
           // Word is already revealed or pinned visible
@@ -4637,7 +4705,40 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-
+  // 1. Ayah Grading Modal Shortcuts: 1, 2, 3, 4 to Grade & Escape to Close
+  const isGradingModalOpen = ayahGradingOverlay && ayahGradingOverlay.classList.contains('show');
+  if (isGradingModalOpen) {
+    if (e.key === '1' || e.code === 'Digit1' || e.code === 'Numpad1') {
+      e.preventDefault();
+      gradeCurrentAyah(1);
+      return;
+    }
+    if (e.key === '2' || e.code === 'Digit2' || e.code === 'Numpad2') {
+      e.preventDefault();
+      gradeCurrentAyah(2);
+      return;
+    }
+    if (e.key === '3' || e.code === 'Digit3' || e.code === 'Numpad3') {
+      e.preventDefault();
+      gradeCurrentAyah(3);
+      return;
+    }
+    if (e.key === '4' || e.code === 'Digit4' || e.code === 'Numpad4') {
+      e.preventDefault();
+      gradeCurrentAyah(4);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAyahGradingModal();
+      return;
+    }
+    if (['ArrowLeft', 'ArrowRight', ' ', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault();
+      return;
+    }
+    return;
+  }
 
   // Arrow Down: switch to Next Ayah
   if (e.key === 'ArrowDown') {
@@ -4704,6 +4805,11 @@ window.addEventListener('keydown', (e) => {
         const curOverride = wordVisOverrides[wordKey];
         setWordVisibilityOverride(currentSurahNumber, vNum, wIdx + 1, curOverride === 'hidden' ? null : 'hidden');
       }
+    }
+    // 'g': Toggle Grade Reveal Mode
+    else if (e.key.toLowerCase() === 'g') {
+      e.preventDefault();
+      if (memToggleGradeBtn) memToggleGradeBtn.click();
     }
   }
 });
@@ -4983,6 +5089,7 @@ function openAyahGradingModal(surahNum, verseNum) {
 }
 
 function closeAyahGradingModal() {
+  isGradeModalFromReveal = false;
   ayahGradingOverlay.classList.remove('show');
 }
 
@@ -5045,6 +5152,17 @@ function gradeCurrentAyah(rating) {
 
   const ratingNames = ['Again', 'Hard', 'Good', 'Easy'];
   showToastNotification(`Ayah ${verse.verseNumber} graded: ${ratingNames[rating - 1]}`);
+
+  if (isGradeModalFromReveal) {
+    isGradeModalFromReveal = false;
+    closeAyahGradingModal();
+    if (verse.verseNumber < surahData.verses.length) {
+      switchToAyah(verse.verseNumber + 1);
+    } else {
+      showToastNotification(`Ayah ${verse.verseNumber} graded! Surah completed 🎉`);
+    }
+    return;
+  }
 
   // Advance to next Ayah automatically if available, otherwise refresh
   if (currentGradingVerseIndex < surahData.verses.length - 1) {
@@ -5109,20 +5227,44 @@ if (btnOpenFsrsFromGrade) {
   });
 }
 
-// Grade Mode Toggle Listener
+// Grade Reveal Mode Toggle Listener
 if (memToggleGradeBtn) {
   memToggleGradeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     isGradeMode = !isGradeMode;
     memToggleGradeBtn.classList.toggle('active', isGradeMode);
     document.body.classList.toggle('grade-mode-active', isGradeMode);
+    if (toggleGradeRevealMode) toggleGradeRevealMode.checked = isGradeMode;
     if (isGradeMode) {
+      showToastNotification('🎓 Grade Reveal Mode ON: Pop-up appears on Ayah reveal (keys 1-4)');
       if (gradeModeToast) {
         gradeModeToast.classList.add('show');
         setTimeout(() => { if (gradeModeToast) gradeModeToast.classList.remove('show'); }, 4000);
       }
+      const curAyah = getActiveMemorizeVerseNum();
+      if (isAyahFullyRevealed(curAyah)) {
+        triggerGradeRevealForAyah(curAyah);
+      }
     } else {
+      showToastNotification('Grade Reveal Mode OFF');
       if (gradeModeToast) gradeModeToast.classList.remove('show');
+    }
+  });
+}
+
+if (toggleGradeRevealMode) {
+  toggleGradeRevealMode.addEventListener('change', () => {
+    isGradeMode = toggleGradeRevealMode.checked;
+    if (memToggleGradeBtn) memToggleGradeBtn.classList.toggle('active', isGradeMode);
+    document.body.classList.toggle('grade-mode-active', isGradeMode);
+    if (isGradeMode) {
+      showToastNotification('🎓 Grade Reveal Mode ON');
+      const curAyah = getActiveMemorizeVerseNum();
+      if (isAyahFullyRevealed(curAyah)) {
+        triggerGradeRevealForAyah(curAyah);
+      }
+    } else {
+      showToastNotification('Grade Reveal Mode OFF');
     }
   });
 }

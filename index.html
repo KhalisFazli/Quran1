@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v1.0.0/dist/font-face.css" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=2.3" />
+  <link rel="stylesheet" href="style.css?v=2.5" />
 </head>
 <body>
 
@@ -198,8 +198,8 @@
           </svg>
         </button>
 
-        <!-- 5. Word FSRS Grade Mode Toggle (Image 1) -->
-        <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleGradeBtn" title="Grade Mode (FSRS Spaced Repetition) - Click Ayah rosette to grade words">
+        <!-- 5. Word FSRS Grade Reveal Mode Toggle (Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleGradeBtn" title="Grade Reveal Mode (FSRS): When Ayah is fully revealed, grade pop-up appears (keys 1-4 • shortcut: 'g')">
           <span style="font-size:0.95rem; line-height:1;">🎓</span>
         </button>
 
@@ -851,7 +851,7 @@
 
   <!-- Grade Mode Toast Notification -->
   <div class="grade-mode-toast" id="gradeModeToast">
-    <span>🎓 Grade Mode ON: Click any Ayah rosette (number) to grade words</span>
+    <span>🎓 Grade Reveal Mode ON: Pop-up grading appears when Ayah is fully revealed (use 1-4 to grade)</span>
     <button type="button" class="grade-toast-close" id="gradeToastCloseBtn">✕</button>
   </div>
 
@@ -885,24 +885,24 @@
 
       <!-- Ayah 4 FSRS Rating Buttons -->
       <div class="ayah-grade-actions">
-        <button type="button" class="ayah-rating-btn again" id="btnGradeAyahAgain" title="Again (<10m)">
+        <button type="button" class="ayah-rating-btn again" id="btnGradeAyahAgain" title="Again (<10m) - Press 1">
           <span class="c-dot red"></span>
-          <span class="rating-label">Again</span>
-          <span class="rating-interval" id="gradeIntAgain"><10m</span>
+          <span class="rating-label">Again <kbd class="grade-key-hint">1</kbd></span>
+          <span class="rating-interval" id="gradeIntAgain">&lt;10m</span>
         </button>
-        <button type="button" class="ayah-rating-btn hard" id="btnGradeAyahHard" title="Hard (1d)">
+        <button type="button" class="ayah-rating-btn hard" id="btnGradeAyahHard" title="Hard (1d) - Press 2">
           <span class="c-dot amber"></span>
-          <span class="rating-label">Hard</span>
+          <span class="rating-label">Hard <kbd class="grade-key-hint">2</kbd></span>
           <span class="rating-interval" id="gradeIntHard">1d</span>
         </button>
-        <button type="button" class="ayah-rating-btn good" id="btnGradeAyahGood" title="Good (3d)">
+        <button type="button" class="ayah-rating-btn good" id="btnGradeAyahGood" title="Good (3d) - Press 3">
           <span class="c-dot green"></span>
-          <span class="rating-label">Good</span>
+          <span class="rating-label">Good <kbd class="grade-key-hint">3</kbd></span>
           <span class="rating-interval" id="gradeIntGood">3d</span>
         </button>
-        <button type="button" class="ayah-rating-btn easy" id="btnGradeAyahEasy" title="Easy (5d)">
+        <button type="button" class="ayah-rating-btn easy" id="btnGradeAyahEasy" title="Easy (5d) - Press 4">
           <span class="c-dot blue"></span>
-          <span class="rating-label">Easy</span>
+          <span class="rating-label">Easy <kbd class="grade-key-hint">4</kbd></span>
           <span class="rating-interval" id="gradeIntEasy">5d</span>
         </button>
       </div>
@@ -1239,6 +1239,16 @@
         </label>
       </div>
 
+      <div class="setting-toggle-row">
+        <span class="setting-toggle-label">
+          <span>🎓</span> Grade Reveal Mode (Auto-popup on Ayah reveal)
+        </span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleGradeRevealMode" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
       <div class="setting-action-row" style="display:flex; gap:8px;">
         <button type="button" class="setting-action-btn" id="btnTestFsrsNotification" style="flex:1;">
           🔔 Test Notification
@@ -1285,6 +1295,6 @@
   <audio id="audioPlayer"></audio>
 
   <!-- External JavaScript Engine -->
-  <script src="app.js?v=2.3" defer></script>
+  <script src="app.js?v=2.5" defer></script>
 </body>
 </html>
