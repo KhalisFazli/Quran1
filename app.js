@@ -776,6 +776,25 @@ function saveMistakeHistory(data) {
   }
 }
 
+function getSurahNameFallback(sNum) {
+  if (chaptersList && chaptersList.length > 0) {
+    const ch = chaptersList.find(c => c.number === sNum);
+    if (ch) return ch.englishName || ch.name;
+  }
+  if (surahData && surahData.meta && surahData.meta.number === sNum) {
+    return surahData.meta.englishName || `Surah ${sNum}`;
+  }
+  try {
+    const cached = localStorage.getItem('quran_chapters_cache');
+    if (cached) {
+      const list = JSON.parse(cached);
+      const ch = list.find(c => c.number === sNum);
+      if (ch) return ch.englishName || ch.name;
+    }
+  } catch (e) {}
+  return `Surah ${sNum}`;
+}
+
 function initMistakeHistory() {
   mistakeHistoryStore = loadMistakeHistory();
   // Backfill if history is empty but active mistakes exist
@@ -793,6 +812,8 @@ function initMistakeHistory() {
     });
     saveMistakeHistory();
   }
+  // Immediately enrich any missing words or translations
+  enrichMistakeHistory().catch(err => console.warn('Init enrichment error:', err));
 }
 
 function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked', customTimestamp = null, autoSave = true) {
@@ -806,17 +827,9 @@ function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked
   let wordPlain = '';
   let wordTrans = '';
   let wordTranslit = '';
-  let surahName = `Surah ${sNum}`;
+  let surahName = getSurahNameFallback(sNum);
 
-  // 1. Try to find surahName from chaptersList or current surah
-  if (chaptersList && chaptersList.length > 0) {
-    const ch = chaptersList.find(c => c.number === sNum);
-    if (ch) surahName = ch.englishName || ch.name || `Surah ${sNum}`;
-  } else if (surahData && surahData.meta && surahData.meta.number === sNum) {
-    surahName = surahData.meta.englishName || `Surah ${sNum}`;
-  }
-
-  // 2. Try to get word details from surahData
+  // 1. Try to get word details from surahData
   if (surahData && surahData.meta && surahData.meta.number === sNum && surahData.verses) {
     const v = surahData.verses.find(x => x.verseNumber === vNum);
     if (v && v.words && v.words[wPos - 1]) {
@@ -828,7 +841,7 @@ function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked
     }
   }
 
-  // 3. Fallback: query DOM if currently loaded
+  // 2. Fallback: query DOM if currently loaded
   if (!wordArabic) {
     const el = document.querySelector(`.mushaf-word[data-verse-num="${vNum}"][data-word-idx="${wPos - 1}"]`);
     if (el) {
@@ -839,7 +852,7 @@ function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked
     }
   }
 
-  // 4. Fallback: search in-memory cache
+  // 3. Fallback: search in-memory cache
   if (!wordArabic && surahCache) {
     for (const [k, cData] of surahCache.entries()) {
       if (cData && cData.meta && cData.meta.number === sNum && cData.verses) {
@@ -856,6 +869,7 @@ function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked
     }
   }
 
+  const isWordPlaceholder = !wordArabic || wordArabic.startsWith('Word #');
   const entry = {
     id: 'mh_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
     timestamp,
@@ -878,12 +892,145 @@ function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked
 
   if (autoSave) {
     saveMistakeHistory();
-    if (mistakeHistoryModal && mistakeHistoryModal.style.display === 'flex') {
+    const modal = document.getElementById('mistakeHistoryModal');
+    if (modal && (modal.classList.contains('show') || modal.style.display === 'flex')) {
       renderMistakeHistoryModal();
     }
   }
 
+  if (isWordPlaceholder) {
+    enrichMistakeHistory().catch(() => {});
+  }
+
   return entry;
+}
+
+let isEnrichingMistakes = false;
+async function enrichMistakeHistory() {
+  if (isEnrichingMistakes || !mistakeHistoryStore || mistakeHistoryStore.length === 0) return;
+  isEnrichingMistakes = true;
+
+  try {
+    let needsSave = false;
+    const toEnrich = mistakeHistoryStore.filter(e => 
+      !e.wordArabic || 
+      e.wordArabic.startsWith('Word #') || 
+      !e.wordTrans || 
+      !e.surahName || 
+      e.surahName.startsWith('Surah ')
+    );
+
+    if (toEnrich.length === 0) return;
+
+    // 1. Resolve surah names
+    toEnrich.forEach(entry => {
+      if (!entry.surahName || entry.surahName.startsWith('Surah ')) {
+        const sName = getSurahNameFallback(entry.surah);
+        if (sName && !sName.startsWith('Surah ')) {
+          entry.surahName = sName;
+          needsSave = true;
+        }
+      }
+    });
+
+    // 2. Resolve missing words
+    for (const entry of toEnrich) {
+      if (entry.wordArabic && !entry.wordArabic.startsWith('Word #') && entry.wordTrans) {
+        continue;
+      }
+
+      const sNum = parseInt(entry.surah);
+      const vNum = parseInt(entry.verse);
+      const wPos = parseInt(entry.wordPos);
+
+      let foundWord = null;
+
+      // Check surahData
+      if (surahData && surahData.meta && surahData.meta.number === sNum && surahData.verses) {
+        const v = surahData.verses.find(x => x.verseNumber === vNum);
+        if (v && v.words && v.words[wPos - 1]) {
+          foundWord = v.words[wPos - 1];
+          if (surahData.meta.englishName) entry.surahName = surahData.meta.englishName;
+        }
+      }
+
+      // Check surahCache
+      if (!foundWord && surahCache) {
+        for (const [k, cData] of surahCache.entries()) {
+          if (cData && cData.meta && cData.meta.number === sNum && cData.verses) {
+            const v = cData.verses.find(x => x.verseNumber === vNum);
+            if (v && v.words && v.words[wPos - 1]) {
+              foundWord = v.words[wPos - 1];
+              if (cData.meta.englishName) entry.surahName = cData.meta.englishName;
+              break;
+            }
+          }
+        }
+      }
+
+      // Check offline local storage
+      if (!foundWord && typeof getSurahFromLocalOffline === 'function') {
+        try {
+          const offData = await getSurahFromLocalOffline(sNum);
+          if (offData && offData.verses) {
+            const v = offData.verses.find(x => x.verseNumber === vNum);
+            if (v && v.words && v.words[wPos - 1]) {
+              foundWord = v.words[wPos - 1];
+              if (offData.meta && offData.meta.englishName) entry.surahName = offData.meta.englishName;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Fallback: Fetch verse from Quran.com API
+      if (!foundWord) {
+        try {
+          const res = await fetch(`https://api.quran.com/api/v4/verses/by_key/${sNum}:${vNum}?language=en&words=true&word_fields=text_uthmani`);
+          if (res.ok) {
+            const json = await res.json();
+            if (json && json.verse && json.verse.words) {
+              const rawWords = json.verse.words.filter(w => w.char_type_name === 'word');
+              const bismillahWords = ["بِسْمِ", "ٱللَّهِ", "ٱلرَّحْمَـٰنِ", "ٱلرَّحِيمِ", "اللَّهِ", "الرَّحْمٰنِ", "الرَّحِيمِ"];
+              if (vNum === 1 && sNum !== 1 && sNum !== 9) {
+                while (rawWords.length > 0 && bismillahWords.includes(rawWords[0].text_uthmani)) {
+                  rawWords.shift();
+                }
+              }
+              const targetW = rawWords[wPos - 1] || rawWords.find(w => w.position === wPos);
+              if (targetW) {
+                foundWord = {
+                  arabic: targetW.text_uthmani,
+                  plain: typeof stripHarakat === 'function' ? stripHarakat(targetW.text_uthmani) : targetW.text_uthmani,
+                  translation: targetW.translation ? targetW.translation.text : '',
+                  transliteration: targetW.transliteration ? targetW.transliteration.text : ''
+                };
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`Could not enrich word ${sNum}:${vNum}#${wPos}:`, err);
+        }
+      }
+
+      if (foundWord) {
+        entry.wordArabic = foundWord.arabic || entry.wordArabic;
+        entry.wordPlain = foundWord.plain || entry.wordPlain;
+        entry.wordTrans = foundWord.translation || entry.wordTrans;
+        entry.wordTranslit = foundWord.transliteration || entry.wordTranslit;
+        needsSave = true;
+      }
+    }
+
+    if (needsSave) {
+      saveMistakeHistory();
+      const modal = document.getElementById('mistakeHistoryModal');
+      if (modal && (modal.classList.contains('show') || modal.style.display === 'flex')) {
+        renderMistakeHistoryModal();
+      }
+    }
+  } finally {
+    isEnrichingMistakes = false;
+  }
 }
 
 function formatMistakeTimestamp(ts) {
@@ -908,6 +1055,8 @@ function openMistakeHistoryModal(e) {
   } catch (err) {
     console.error('Error rendering mistake history:', err);
   }
+  // Automatically fetch and enrich any missing Arabic words, translations or Surah names
+  enrichMistakeHistory().catch(err => console.warn('Enrichment error:', err));
 }
 
 function closeMistakeHistoryModal(e) {
@@ -1019,6 +1168,8 @@ function renderMistakeHistoryModal() {
       ? `<span class="m-badge badge-recurrent" title="Marked as mistake ${recurCount} times">⚠️ Repeated ${recurCount}×</span>`
       : '';
 
+    const isPlaceholder = !entry.wordArabic || entry.wordArabic.startsWith('Word #');
+
     html += `
       <div class="mistake-item-card ${isActive ? 'is-active-mistake' : ''}">
         <div class="mistake-item-top">
@@ -1032,10 +1183,14 @@ function renderMistakeHistoryModal() {
 
         <div class="mistake-item-main">
           <div class="mistake-word-trans-block">
-            <span class="mistake-word-trans">${escapeHtml(entry.wordTrans || '—')}</span>
+            <span class="mistake-word-trans" ${isPlaceholder && !entry.wordTrans ? 'style="font-style:italic; color:#8c7860;"' : ''}>
+              ${escapeHtml(entry.wordTrans || (isPlaceholder ? 'Fetching word details...' : '—'))}
+            </span>
             ${entry.wordTranslit ? `<span class="mistake-word-translit">${escapeHtml(entry.wordTranslit)}</span>` : ''}
           </div>
-          <div class="mistake-arabic-word ${isActive ? 'highlight-mistake' : ''}">${escapeHtml(entry.wordArabic || entry.wordPlain || '—')}</div>
+          <div class="mistake-arabic-word ${isActive ? 'highlight-mistake' : ''}" ${isPlaceholder ? 'style="font-size:1.15rem; opacity:0.85;"' : ''}>
+            ${escapeHtml((isPlaceholder ? '⏳ ' : '') + (entry.wordArabic || entry.wordPlain || '—'))}
+          </div>
         </div>
 
         <div class="mistake-item-actions">
@@ -1495,6 +1650,7 @@ async function initChapters() {
     localStorage.setItem('quran_chapters_cache', JSON.stringify(chaptersList));
     renderSurahDropdown();
     if (isLibraryView) renderSurahLibrary();
+    enrichMistakeHistory().catch(() => {});
   } catch (e) {
     console.error('Failed to load chapters from network:', e);
     if (!chaptersList || !chaptersList.length) {
@@ -1503,6 +1659,7 @@ async function initChapters() {
         chaptersList = await localRes.json();
         renderSurahDropdown();
         if (isLibraryView) renderSurahLibrary();
+        enrichMistakeHistory().catch(() => {});
       } catch (err2) {
         console.error('Failed to load fallback chapters:', err2);
       }
@@ -1617,6 +1774,7 @@ async function loadSurah(num) {
     };
 
     surahCache.set(cacheKey, surahData);
+    enrichMistakeHistory().catch(() => {});
 
     rangeStart = 1;
     rangeEnd = surahData.verses.length;
@@ -6457,9 +6615,9 @@ if (initReciterSelect) {
   initReciterSelect.value = selectedReciter;
 }
 
+initChapters();
 initMistakeHistory();
 initAyahNotes();
-initChapters();
 checkUrlHashSync();
 showLibraryView();
 loadSurah(76).then(() => {
