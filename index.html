@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>The Noble Quran | القرآن الكريم</title>
+  <title>Memorize Quran | القرآن الكريم</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v1.0.0/dist/font-face.css" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=2.5" />
+  <link rel="stylesheet" href="style.css?v=2.8" />
 </head>
-<body>
+<body class="library-active">
 
   <!-- Reusable Ayah Rosette SVG Symbol Definition (Clear Center matching Image 2) -->
   <svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
@@ -34,11 +34,11 @@
   <!-- Top Sticky Header (Image 2 Layout) -->
   <header class="top-header">
     <div class="surah-picker">
-      <button class="header-sq-btn btn-home-library active" id="btnHomeLibrary" title="Quran Surah Library (Home)">
+      <button class="header-sq-btn btn-home-library active" id="btnHomeLibrary" title="Memorize Quran (Home)">
         <span style="font-size:1.05rem; line-height:1;">🏛️</span>
       </button>
       <button class="surah-select-btn" id="surahSelectBtn">
-        <span id="headerSurahTitle">76. Al-Insaan</span>
+        <span id="headerSurahTitle">Memorize Quran</span>
         <span class="chevron-arrow">▾</span>
       </button>
       <div class="dropdown-menu" id="surahDropdown"></div>
@@ -105,7 +105,7 @@
     <section class="surah-library-view" id="surahLibraryView">
       <div class="library-header-banner">
         <div class="lib-banner-title">
-          <h2>القرآن الكريم • Quran Surah Library</h2>
+          <h2>القرآن الكريم • Memorize Quran</h2>
           <p>114 Surahs • Track your memorization, FSRS reviews, notes & mistakes</p>
         </div>
         <div class="lib-stats-summary" id="libStatsSummary"></div>
@@ -164,7 +164,7 @@
     <div class="mem-top-tabs-bar">
       <div class="mem-actions-group" id="memActionsGroup">
         <!-- 1. Rosette Numbers Toggle (Active dark arch in Image 1) -->
-        <button type="button" class="mem-arch-btn mem-circle-btn active" id="memToggleAyahNumBtn" title="Toggle Ayah Numbers Always Visible">
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleAyahNumBtn" title="Toggle Ayah Numbers Always Visible">
           <span>۝</span>
         </button>
 
@@ -653,9 +653,9 @@
   </div>
 
   <!-- Persistent Bottom Audio Player Bar (Minimized By Default as a sleek line) -->
-  <div class="audio-bar-wrapper open minimized" id="audioBarWrapper" title="Click to open audio bar">
+  <div class="audio-bar-wrapper open minimized" id="audioBarWrapper" title="Click to show audio player">
     <div class="audio-line-indicator" id="audioLineIndicator"></div>
-    <button class="audio-collapse-btn" id="audioCollapseBtn" title="Minimize audio bar">⌵</button>
+    <button class="audio-collapse-btn" id="audioCollapseBtn" title="Show audio player">▲</button>
 
     <div class="audio-bar">
       <div class="audio-progress-container" id="progressContainer">
@@ -1295,6 +1295,6 @@
   <audio id="audioPlayer"></audio>
 
   <!-- External JavaScript Engine -->
-  <script src="app.js?v=2.5" defer></script>
+  <script src="app.js?v=2.8" defer></script>
 </body>
 </html>

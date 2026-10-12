@@ -55,7 +55,7 @@ let currentMemorizeAyah = 1;
 let totalWordElements = [];
 let totalAyahMarkers = [];
 let isHarakatVisible = true;
-let isAyahNumberAlwaysVisible = true;
+let isAyahNumberAlwaysVisible = false;
 let isAutoRevealing = false;
 let autoRevealInterval = null;
 let autoRevealSpeed = 1.0;
@@ -1306,6 +1306,7 @@ window.toggleMistakeFromHistory = toggleMistakeFromHistory;
 
 function showLibraryView() {
   isLibraryView = true;
+  document.body.classList.add('library-active');
   if (surahLibraryView) surahLibraryView.style.display = 'block';
   const surahBanner = document.getElementById('surahBanner');
   if (surahBanner) surahBanner.style.display = 'none';
@@ -1314,13 +1315,14 @@ function showLibraryView() {
   if (vbvView) vbvView.style.display = 'none';
   if (memorizeBar) memorizeBar.classList.remove('show');
   if (btnHomeLibrary) btnHomeLibrary.classList.add('active');
-  if (headerSurahTitle) headerSurahTitle.textContent = 'Quran Surah Library';
+  if (headerSurahTitle) headerSurahTitle.textContent = 'Memorize Quran';
   if (pageMetaText) pageMetaText.textContent = '114 Surahs • Library';
   renderSurahLibrary();
 }
 
 function hideLibraryView() {
   isLibraryView = false;
+  document.body.classList.remove('library-active');
   if (surahLibraryView) surahLibraryView.style.display = 'none';
   const surahBanner = document.getElementById('surahBanner');
   if (surahBanner) surahBanner.style.display = 'flex';
@@ -1684,6 +1686,22 @@ async function loadSurah(num) {
   currentSurahNumber = num;
   isVbvRenderedForCurrentSurah = false;
   promptedGradeAyahs.clear();
+  revealedWordCount = 0;
+  currentMemorizeAyah = 1;
+  stopAutoReveal();
+  isAyahNumberAlwaysVisible = false;
+  if (memToggleAyahNumBtn) {
+    memToggleAyahNumBtn.classList.remove('active');
+  }
+  if (currentActiveSpan) {
+    currentActiveSpan.classList.remove('ayah-active-span');
+    currentActiveSpan = null;
+  }
+  if (audioPlayer && !audioPlayer.paused) {
+    audioPlayer.pause();
+  }
+  currentAudioIndex = 0;
+
   const cacheKey = `${num}_${selectedReciter}`;
 
   if (surahCache.has(cacheKey)) {
@@ -1696,6 +1714,8 @@ async function loadSurah(num) {
     renderViews();
     if (isLibraryView) {
       showLibraryView();
+    } else if (isMemorizeMode && totalWordElements.length > 0) {
+      scrollWordIntoFocus(totalWordElements[0], false);
     }
     return;
   }
@@ -1719,6 +1739,8 @@ async function loadSurah(num) {
     renderViews();
     if (isLibraryView) {
       showLibraryView();
+    } else if (isMemorizeMode && totalWordElements.length > 0) {
+      scrollWordIntoFocus(totalWordElements[0], false);
     }
     return;
   }
@@ -1799,6 +1821,8 @@ async function loadSurah(num) {
     renderViews();
     if (isLibraryView) {
       showLibraryView();
+    } else if (isMemorizeMode && totalWordElements.length > 0) {
+      scrollWordIntoFocus(totalWordElements[0], false);
     }
 
     // Auto-cache to local offline store in background
@@ -1822,6 +1846,8 @@ async function loadSurah(num) {
       renderViews();
       if (isLibraryView) {
         showLibraryView();
+      } else if (isMemorizeMode && totalWordElements.length > 0) {
+        scrollWordIntoFocus(totalWordElements[0], false);
       }
       return;
     }
@@ -2063,9 +2089,12 @@ function toggleMemorizeMode() {
 
     revealedWordCount = 0;
     currentMemorizeAyah = 1;
+    isAyahNumberAlwaysVisible = false;
+    if (memToggleAyahNumBtn) {
+      memToggleAyahNumBtn.classList.remove('active');
+    }
     memorizeBar.classList.add('show');
-    isMinimized = true;
-    audioBarWrapper.classList.add('open', 'minimized');
+    minimizeAudioBar();
     applyMemorizeState(true);
 
     if (totalWordElements.length > 0) {
@@ -2945,26 +2974,52 @@ function hideAyahContextMenu() {
 // AUDIO BAR & AUTOPLAY WITH REPEAT CONTROLS
 // =========================================================
 
-function showAudioBar() {
+function expandAudioBar() {
   if (!audioBarWrapper) return;
+  isMinimized = false;
   audioBarWrapper.classList.remove('minimized');
   audioBarWrapper.classList.add('open');
-  isMinimized = false;
   if (audioCollapseBtn) {
-    audioCollapseBtn.textContent = '▾';
-    audioCollapseBtn.title = 'Minimize audio bar to line';
+    audioCollapseBtn.textContent = '▼';
+    audioCollapseBtn.title = 'Minimize audio bar';
+    audioCollapseBtn.setAttribute('aria-label', 'Minimize audio bar');
+  }
+  audioBarWrapper.removeAttribute('title');
+}
+
+function minimizeAudioBar() {
+  if (!audioBarWrapper) return;
+  isMinimized = true;
+  audioBarWrapper.classList.add('open', 'minimized');
+  if (audioCollapseBtn) {
+    audioCollapseBtn.textContent = '▲';
+    audioCollapseBtn.title = 'Show audio player';
+    audioCollapseBtn.setAttribute('aria-label', 'Show audio player');
+  }
+  audioBarWrapper.setAttribute('title', 'Click to show audio player');
+}
+
+function toggleAudioBar() {
+  if (isMinimized) {
+    expandAudioBar();
+  } else {
+    minimizeAudioBar();
   }
 }
 
-function openAudioBar(forceUnminimize = true) {
+function showAudioBar() {
+  expandAudioBar();
+}
+
+function openAudioBar(forceUnminimize = false) {
   if (!audioBarWrapper) return;
   audioBarWrapper.classList.add('open');
   if (forceUnminimize) {
-    showAudioBar();
+    expandAudioBar();
   } else if (isMinimized) {
-    audioBarWrapper.classList.add('minimized');
+    minimizeAudioBar();
   } else {
-    audioBarWrapper.classList.remove('minimized');
+    expandAudioBar();
   }
 }
 
@@ -2977,8 +3032,7 @@ function closeAudioBar() {
     currentActiveSpan.classList.remove('ayah-active-span');
     currentActiveSpan = null;
   }
-  isMinimized = false;
-  audioBarWrapper.classList.remove('open', 'minimized');
+  minimizeAudioBar();
 }
 
 window.switchToAyah = function(targetAyah, autoPlayIfPlaying = true) {
@@ -3280,24 +3334,20 @@ audioPlayer.addEventListener('pause', () => {
 closeAudioBtn.addEventListener('click', closeAudioBar);
 
 // Clicking the minimized line expands the audio bar
-audioBarWrapper.addEventListener('click', (e) => {
-  if (isMinimized) {
-    isMinimized = false;
-    audioBarWrapper.classList.remove('minimized');
-    audioBarWrapper.classList.add('open');
-    if (audioCollapseBtn) {
-      audioCollapseBtn.textContent = '⌵';
-      audioCollapseBtn.title = 'Minimize audio bar to line';
+if (audioBarWrapper) {
+  audioBarWrapper.addEventListener('click', (e) => {
+    if (isMinimized) {
+      expandAudioBar();
     }
-  }
-});
+  });
+}
 
-audioCollapseBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  isMinimized = true;
-  audioBarWrapper.classList.add('minimized');
-  audioBarWrapper.setAttribute('title', 'Click to open audio bar');
-});
+if (audioCollapseBtn) {
+  audioCollapseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleAudioBar();
+  });
+}
 
 audioMuteBtn.addEventListener('click', () => {
   audioPlayer.muted = !audioPlayer.muted;
@@ -4153,7 +4203,9 @@ viewBtnReading.addEventListener('click', () => {
     totalAyahMarkers = Array.from(readingView.querySelectorAll('.ayah-marker'));
     applyMemorizeState(true);
   }
-  showAudioBar();
+  if (isMinimized) {
+    minimizeAudioBar();
+  }
 });
 
 viewBtnVbv.addEventListener('click', () => {
@@ -4170,7 +4222,9 @@ viewBtnVbv.addEventListener('click', () => {
     totalAyahMarkers = Array.from(vbvView.querySelectorAll('.ayah-marker'));
     applyMemorizeState(true);
   }
-  showAudioBar();
+  if (isMinimized) {
+    minimizeAudioBar();
+  }
 });
 
 settingsToggle.addEventListener('click', () => {
@@ -4386,6 +4440,7 @@ window.selectSurah = function(id) {
     hideLibraryView();
   }
   loadSurah(id);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
 // =========================================================
@@ -6743,9 +6798,9 @@ if (btnVoicePlayBoth) btnVoicePlayBoth.addEventListener('click', togglePlayBoth)
 if (btnVoiceCompareQari) btnVoiceCompareQari.addEventListener('click', toggleAyahAudioInHud);
 if (btnVoiceDiscard) btnVoiceDiscard.addEventListener('click', discardVoiceRecording);
 
-// Boot
+// Boot: minimize audio bar everywhere by default
 if (audioBarWrapper) {
-  showAudioBar();
+  minimizeAudioBar();
 }
 
 // Sync reciter UI on boot

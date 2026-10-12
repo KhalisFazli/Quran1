@@ -100,6 +100,14 @@ body {
   gap: 0.5rem;
 }
 
+/* Hide page meta (page/juz/badges) and view switchers on Home screen */
+body.library-active #headerPageMeta,
+body.library-active #viewBtnMemorize,
+body.library-active #viewBtnVbv,
+body.library-active #viewBtnReading {
+  display: none !important;
+}
+
 /* 4 Squircle Header Buttons matching Image 2 */
 .header-sq-btn {
   background: #faebd7;
@@ -1031,16 +1039,16 @@ body.mistake-mode-active .mushaf-word {
 }
 .audio-bar-wrapper.open { transform: translateY(0); }
 
-/* Minimized: IT IS PHYSICALLY JUST A 3PX LINE - ZERO OVERLAP WITH CONTROL BAR */
+/* Minimized: IT IS PHYSICALLY JUST A 3PX LINE WITH A VISIBLE TOGGLE TAB */
 .audio-bar-wrapper.minimized,
 .audio-bar-wrapper.open.minimized {
   height: 3px !important;
   min-height: 0 !important;
   max-height: 3px !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   transform: translateY(0) !important;
   cursor: pointer;
-  z-index: 150 !important;
+  z-index: 195 !important;
 }
 .audio-bar-wrapper.minimized .audio-bar {
   opacity: 0 !important;
@@ -1048,7 +1056,9 @@ body.mistake-mode-active .mushaf-word {
   display: none !important;
 }
 .audio-bar-wrapper.minimized .audio-collapse-btn {
-  display: none !important;
+  display: flex !important;
+  top: -28px !important;
+  right: 24px !important;
 }
 
 /* Sleek line indicator on the top edge */
@@ -1074,7 +1084,7 @@ body.memorize-active .audio-bar-wrapper {
 }
 body.memorize-active .audio-bar-wrapper.minimized {
   bottom: 127px !important;
-  z-index: 150 !important;
+  z-index: 195 !important;
 }
 
 .audio-collapse-btn {
@@ -1094,8 +1104,11 @@ body.memorize-active .audio-bar-wrapper.minimized {
   cursor: pointer;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
   z-index: 210;
-  font-size: 0.95rem;
+  font-size: 0.75rem;
   font-weight: bold;
+  line-height: 1;
+  padding: 0;
+  user-select: none;
   transition: background 0.15s, transform 0.15s;
 }
 .audio-collapse-btn:hover {
