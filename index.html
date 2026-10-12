@@ -125,6 +125,7 @@
           <button type="button" class="lib-chip" data-filter="notes">📝 Notes</button>
           <button type="button" class="lib-chip" data-filter="meccan">Meccan</button>
           <button type="button" class="lib-chip" data-filter="medinan">Medinan</button>
+          <button type="button" class="lib-chip lib-btn-history" id="btnLibOpenMistakeHistory" style="background:#fef2f2; border-color:#fecaca; color:#b91c1c; font-weight:700;">📜 Mistake History</button>
         </div>
       </div>
 
@@ -396,6 +397,12 @@
           <span>Select Multiple Words...</span>
         </div>
       </div>
+      <div class="ctx-item" id="ctxItemMistakeHistory" title="View Mistake History Log">
+        <div class="ctx-item-left">
+          <span style="font-size:0.95rem;">📜</span>
+          <span>Mistake History</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -486,6 +493,12 @@
         <span id="ayahCtxNoteLabel">Add / Edit Note</span>
       </div>
     </div>
+    <div class="ctx-item" id="ayahCtxMistakeHistory" title="View Mistake History Log">
+      <div class="ctx-item-left">
+        <span style="font-size:0.95rem;">📜</span>
+        <span>Mistake History</span>
+      </div>
+    </div>
   </div>
 
   <!-- Ayah Note Modal Dialog -->
@@ -510,6 +523,88 @@
         <div style="flex:1;"></div>
         <button type="button" class="ayah-note-btn btn-cancel-note" id="btnCancelAyahNote">Cancel</button>
         <button type="button" class="ayah-note-btn btn-save-note" id="btnSaveAyahNote">💾 Save Note</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mistake History Modal Dialog -->
+  <div class="mistake-history-modal-overlay" id="mistakeHistoryModal" style="display:none;">
+    <div class="mistake-history-card">
+      <div class="mistake-history-header">
+        <div class="mistake-history-title-wrap">
+          <span class="mistake-history-icon">📜</span>
+          <div>
+            <h3>Mistake History & Practice Log</h3>
+            <span class="mistake-history-sub" id="mistakeHistorySub">Track flagged mistakes, recurrence frequency, and review</span>
+          </div>
+        </div>
+        <button type="button" class="mistake-history-close" id="btnCloseMistakeHistoryModal" title="Close">✕</button>
+      </div>
+
+      <!-- KPI Stats Summary Row -->
+      <div class="mistake-kpi-summary-row" id="mistakeKpiSummaryRow">
+        <div class="mistake-kpi-pill">
+          <span class="kpi-num" id="kpiTotalMistakesRecorded">0</span>
+          <span class="kpi-lbl">Total Logged</span>
+        </div>
+        <div class="mistake-kpi-pill kpi-active">
+          <span class="kpi-num" id="kpiActiveMistakesCount">0</span>
+          <span class="kpi-lbl">Active Flagged</span>
+        </div>
+        <div class="mistake-kpi-pill">
+          <span class="kpi-num" id="kpiCurrentSurahMistakesCount">0</span>
+          <span class="kpi-lbl" id="kpiCurrentSurahLabel">In Surah</span>
+        </div>
+        <div class="mistake-kpi-pill">
+          <span class="kpi-num" id="kpiUniqueWordsCount">0</span>
+          <span class="kpi-lbl">Unique Words</span>
+        </div>
+      </div>
+
+      <!-- Toolbar: Search, Filters, Sort & Actions -->
+      <div class="mistake-history-toolbar">
+        <div class="mistake-search-box">
+          <span class="mistake-search-icon">🔍</span>
+          <input type="text" id="mistakeSearchInput" placeholder="Filter by surah, ayah (e.g. 76:2), or meaning..." />
+          <button type="button" class="mistake-clear-search" id="btnClearMistakeSearch" style="display:none;">✕</button>
+        </div>
+
+        <div class="mistake-filter-row">
+          <div class="mistake-filter-chips" id="mistakeFilterChips">
+            <button type="button" class="m-chip active" data-filter="all">All</button>
+            <button type="button" class="m-chip" data-filter="active">Active Flagged</button>
+            <button type="button" class="m-chip" data-filter="current">Current Surah</button>
+            <button type="button" class="m-chip" data-filter="cleared">Resolved</button>
+          </div>
+
+          <div class="mistake-sort-wrap">
+            <label for="mistakeSortSelect">Sort:</label>
+            <select id="mistakeSortSelect">
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="frequent">Most Frequent (Repeated)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable History List -->
+      <div class="mistake-history-body">
+        <div class="mistake-history-list" id="mistakeHistoryList"></div>
+      </div>
+
+      <!-- Footer Actions -->
+      <div class="mistake-history-footer">
+        <button type="button" class="btn-clear-history-log" id="btnClearMistakeHistoryLog" title="Clear mistake history log">
+          🗑️ Clear History Log
+        </button>
+        <div style="flex:1;"></div>
+        <button type="button" class="btn-practice-mistakes" id="btnPracticeMistakes" title="Practice troublesome ayahs">
+          ⚡ Practice Troubled Ayahs
+        </button>
+        <button type="button" class="btn-close-mistake-history" id="btnCloseMistakeHistoryFooter">
+          Close
+        </button>
       </div>
     </div>
   </div>
@@ -1101,6 +1196,12 @@
         </button>
         <button type="button" class="setting-action-btn" id="btnResetVisOverrides" style="flex:1;">
           ↺ Reset Overrides
+        </button>
+      </div>
+
+      <div class="setting-action-row" style="margin-top:6px;">
+        <button type="button" class="setting-action-btn" id="btnOpenMistakeHistoryDrawer" style="width:100%; background:#fef2f2; border-color:#fecaca; color:#b91c1c; font-weight:600;">
+          📜 View Mistake History
         </button>
       </div>
 

@@ -112,6 +112,27 @@ const btnDeleteAyahNote = document.getElementById('btnDeleteAyahNote');
 const btnCancelAyahNote = document.getElementById('btnCancelAyahNote');
 const btnSaveAyahNote = document.getElementById('btnSaveAyahNote');
 
+// Mistake History Elements
+const mistakeHistoryModal = document.getElementById('mistakeHistoryModal');
+const btnCloseMistakeHistoryModal = document.getElementById('btnCloseMistakeHistoryModal');
+const btnCloseMistakeHistoryFooter = document.getElementById('btnCloseMistakeHistoryFooter');
+const kpiTotalMistakesRecorded = document.getElementById('kpiTotalMistakesRecorded');
+const kpiActiveMistakesCount = document.getElementById('kpiActiveMistakesCount');
+const kpiCurrentSurahMistakesCount = document.getElementById('kpiCurrentSurahMistakesCount');
+const kpiCurrentSurahLabel = document.getElementById('kpiCurrentSurahLabel');
+const kpiUniqueWordsCount = document.getElementById('kpiUniqueWordsCount');
+const mistakeSearchInput = document.getElementById('mistakeSearchInput');
+const btnClearMistakeSearch = document.getElementById('btnClearMistakeSearch');
+const mistakeFilterChips = document.getElementById('mistakeFilterChips');
+const mistakeSortSelect = document.getElementById('mistakeSortSelect');
+const mistakeHistoryList = document.getElementById('mistakeHistoryList');
+const btnClearMistakeHistoryLog = document.getElementById('btnClearMistakeHistoryLog');
+const btnPracticeMistakes = document.getElementById('btnPracticeMistakes');
+const btnLibOpenMistakeHistory = document.getElementById('btnLibOpenMistakeHistory');
+const btnOpenMistakeHistoryDrawer = document.getElementById('btnOpenMistakeHistoryDrawer');
+const ctxItemMistakeHistory = document.getElementById('ctxItemMistakeHistory');
+const ayahCtxMistakeHistory = document.getElementById('ayahCtxMistakeHistory');
+
 const surahSelectBtn = document.getElementById('surahSelectBtn');
 const surahDropdown = document.getElementById('surahDropdown');
 const headerSurahTitle = document.getElementById('headerSurahTitle');
@@ -402,6 +423,7 @@ const syncStatusMsg = document.getElementById('syncStatusMsg');
 
 // Mistakes & Persistent Visibility Storage
 const MISTAKES_STORAGE_KEY = 'quran_memorize_mistakes';
+const MISTAKE_HISTORY_STORAGE_KEY = 'quran_mistake_history';
 const WORD_VIS_OVERRIDES_KEY = 'quran_word_visibility_overrides';
 const AYAH_VIS_OVERRIDES_KEY = 'quran_ayah_visibility_overrides';
 const POPUP_TRIGGER_KEY = 'quran_word_popup_trigger';
@@ -420,6 +442,10 @@ function saveMistakes(data) {
   } catch (e) {}
 }
 let memorizeMistakes = loadMistakes();
+let mistakeHistoryStore = [];
+let currentMistakeFilter = 'all';
+let currentMistakeSearch = '';
+let currentMistakeSort = 'newest';
 
 function loadWordVisOverrides() {
   try {
@@ -726,6 +752,363 @@ function refreshAyahNotesUi(surahNum, verseNum) {
 }
 
 // =========================================================
+// MISTAKE HISTORY & PRACTICE LOG SYSTEM
+// =========================================================
+
+function loadMistakeHistory() {
+  try {
+    const raw = localStorage.getItem(MISTAKE_HISTORY_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.warn('Failed to load mistake history:', e);
+  }
+  return [];
+}
+
+function saveMistakeHistory(data) {
+  try {
+    localStorage.setItem(MISTAKE_HISTORY_STORAGE_KEY, JSON.stringify(data || mistakeHistoryStore));
+  } catch (e) {
+    console.warn('Failed to save mistake history:', e);
+  }
+}
+
+function initMistakeHistory() {
+  mistakeHistoryStore = loadMistakeHistory();
+  // Backfill if history is empty but active mistakes exist
+  if (mistakeHistoryStore.length === 0 && memorizeMistakes && Object.keys(memorizeMistakes).length > 0) {
+    Object.keys(memorizeMistakes).forEach(key => {
+      const item = memorizeMistakes[key];
+      const parts = key.split(':');
+      if (parts.length >= 3) {
+        const s = parseInt(parts[0]);
+        const v = parseInt(parts[1]);
+        const w = parseInt(parts[2]);
+        const ts = (item && item.timestamp) ? item.timestamp : Date.now();
+        recordMistakeHistoryEntry(s, v, w, 'marked', ts, false);
+      }
+    });
+    saveMistakeHistory();
+  }
+}
+
+function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked', customTimestamp = null, autoSave = true) {
+  const sNum = parseInt(surahNum);
+  const vNum = parseInt(verseNum);
+  const wPos = parseInt(wordPos);
+  const wordKey = `${sNum}:${vNum}:${wPos}`;
+  const timestamp = customTimestamp || Date.now();
+
+  let wordArabic = '';
+  let wordPlain = '';
+  let wordTrans = '';
+  let wordTranslit = '';
+  let surahName = `Surah ${sNum}`;
+
+  // 1. Try to find surahName from chaptersList or current surah
+  if (chaptersList && chaptersList.length > 0) {
+    const ch = chaptersList.find(c => c.number === sNum);
+    if (ch) surahName = ch.englishName || ch.name || `Surah ${sNum}`;
+  } else if (surahData && surahData.meta && surahData.meta.number === sNum) {
+    surahName = surahData.meta.englishName || `Surah ${sNum}`;
+  }
+
+  // 2. Try to get word details from surahData
+  if (surahData && surahData.meta && surahData.meta.number === sNum && surahData.verses) {
+    const v = surahData.verses.find(x => x.verseNumber === vNum);
+    if (v && v.words && v.words[wPos - 1]) {
+      const w = v.words[wPos - 1];
+      wordArabic = w.arabic || '';
+      wordPlain = w.plain || '';
+      wordTrans = w.translation || '';
+      wordTranslit = w.transliteration || '';
+    }
+  }
+
+  // 3. Fallback: query DOM if currently loaded
+  if (!wordArabic) {
+    const el = document.querySelector(`.mushaf-word[data-verse-num="${vNum}"][data-word-idx="${wPos - 1}"]`);
+    if (el) {
+      wordArabic = el.getAttribute('data-orig-arabic') || el.textContent.trim();
+      wordPlain = el.getAttribute('data-plain-arabic') || '';
+      wordTrans = el.getAttribute('data-trans') || '';
+      wordTranslit = el.getAttribute('data-translit') || '';
+    }
+  }
+
+  // 4. Fallback: search in-memory cache
+  if (!wordArabic && surahCache) {
+    for (const [k, cData] of surahCache.entries()) {
+      if (cData && cData.meta && cData.meta.number === sNum && cData.verses) {
+        const v = cData.verses.find(x => x.verseNumber === vNum);
+        if (v && v.words && v.words[wPos - 1]) {
+          const w = v.words[wPos - 1];
+          wordArabic = w.arabic || '';
+          wordPlain = w.plain || '';
+          wordTrans = w.translation || '';
+          wordTranslit = w.transliteration || '';
+          break;
+        }
+      }
+    }
+  }
+
+  const entry = {
+    id: 'mh_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    timestamp,
+    surah: sNum,
+    verse: vNum,
+    wordPos: wPos,
+    wordKey,
+    wordArabic: wordArabic || `Word #${wPos}`,
+    wordPlain: wordPlain || '',
+    wordTrans: wordTrans || '',
+    wordTranslit: wordTranslit || '',
+    surahName,
+    action: action
+  };
+
+  mistakeHistoryStore.unshift(entry);
+  if (mistakeHistoryStore.length > 500) {
+    mistakeHistoryStore = mistakeHistoryStore.slice(0, 500);
+  }
+
+  if (autoSave) {
+    saveMistakeHistory();
+    if (mistakeHistoryModal && mistakeHistoryModal.style.display === 'flex') {
+      renderMistakeHistoryModal();
+    }
+  }
+
+  return entry;
+}
+
+function formatMistakeTimestamp(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (isToday) return `Today, ${timeStr}`;
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${timeStr}`;
+}
+
+function openMistakeHistoryModal() {
+  if (mistakeHistoryModal) {
+    mistakeHistoryModal.style.display = 'flex';
+    renderMistakeHistoryModal();
+  }
+}
+
+function closeMistakeHistoryModal() {
+  if (mistakeHistoryModal) {
+    mistakeHistoryModal.style.display = 'none';
+  }
+}
+
+function renderMistakeHistoryModal() {
+  if (!mistakeHistoryModal) return;
+
+  // 1. Recurrence frequency map
+  const mistakeFreqMap = {};
+  mistakeHistoryStore.forEach(e => {
+    if (e.action === 'marked') {
+      mistakeFreqMap[e.wordKey] = (mistakeFreqMap[e.wordKey] || 0) + 1;
+    }
+  });
+
+  // 2. KPI metrics
+  const activeKeys = Object.keys(memorizeMistakes || {});
+  const currentSurahMistakes = activeKeys.filter(k => k.startsWith(`${currentSurahNumber}:`)).length;
+  const uniqueWordsSet = new Set(mistakeHistoryStore.map(e => e.wordKey));
+
+  if (kpiTotalMistakesRecorded) kpiTotalMistakesRecorded.textContent = mistakeHistoryStore.length;
+  if (kpiActiveMistakesCount) kpiActiveMistakesCount.textContent = activeKeys.length;
+  if (kpiCurrentSurahMistakesCount) kpiCurrentSurahMistakesCount.textContent = currentSurahMistakes;
+  if (kpiCurrentSurahLabel) kpiCurrentSurahLabel.textContent = `In Surah ${currentSurahNumber}`;
+  if (kpiUniqueWordsCount) kpiUniqueWordsCount.textContent = uniqueWordsSet.size;
+
+  // 3. Filter entries
+  const query = (currentMistakeSearch || '').trim().toLowerCase();
+  let list = mistakeHistoryStore.filter(entry => {
+    const isActive = Boolean(memorizeMistakes && memorizeMistakes[entry.wordKey]);
+    if (currentMistakeFilter === 'active' && !isActive) return false;
+    if (currentMistakeFilter === 'current' && entry.surah !== currentSurahNumber) return false;
+    if (currentMistakeFilter === 'cleared' && isActive && entry.action !== 'cleared') return false;
+
+    if (query) {
+      const refStr = `${entry.surah}:${entry.verse}`;
+      const surahNameMatch = (entry.surahName || '').toLowerCase().includes(query);
+      const refMatch = refStr.includes(query) || `${entry.surah}` === query;
+      const transMatch = (entry.wordTrans || '').toLowerCase().includes(query);
+      const translitMatch = (entry.wordTranslit || '').toLowerCase().includes(query);
+      const arabicMatch = (entry.wordArabic || '').includes(query) || (entry.wordPlain || '').includes(query);
+      if (!refMatch && !surahNameMatch && !transMatch && !translitMatch && !arabicMatch) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // 4. Sort entries
+  if (currentMistakeSort === 'oldest') {
+    list.sort((a, b) => a.timestamp - b.timestamp);
+  } else if (currentMistakeSort === 'frequent') {
+    list.sort((a, b) => {
+      const fa = mistakeFreqMap[a.wordKey] || 0;
+      const fb = mistakeFreqMap[b.wordKey] || 0;
+      if (fb !== fa) return fb - fa;
+      return b.timestamp - a.timestamp;
+    });
+  } else {
+    // 'newest'
+    list.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  // 5. Render to list
+  if (!mistakeHistoryList) return;
+
+  if (list.length === 0) {
+    mistakeHistoryList.innerHTML = `
+      <div class="mistake-empty-state">
+        <div class="mistake-empty-icon">🎉</div>
+        <div class="mistake-empty-title">No Mistakes Found</div>
+        <div class="mistake-empty-desc">
+          ${query || currentMistakeFilter !== 'all' 
+            ? 'No records match your active search or filter criteria.' 
+            : 'You have not recorded any mistakes yet. Keep up the great memorization!'}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  list.forEach(entry => {
+    const isActive = Boolean(memorizeMistakes && memorizeMistakes[entry.wordKey]);
+    const actionBadge = entry.action === 'marked'
+      ? `<span class="m-badge badge-action-marked">🚩 Marked</span>`
+      : `<span class="m-badge badge-action-cleared">✓ Cleared</span>`;
+
+    const recurCount = mistakeFreqMap[entry.wordKey] || 0;
+    const recurBadge = recurCount > 1
+      ? `<span class="m-badge badge-recurrent" title="Marked as mistake ${recurCount} times">⚠️ Repeated ${recurCount}×</span>`
+      : '';
+
+    html += `
+      <div class="mistake-item-card ${isActive ? 'is-active-mistake' : ''}">
+        <div class="mistake-item-top">
+          <div class="mistake-meta-left">
+            ${actionBadge}
+            ${recurBadge}
+            <span class="mistake-ref-tag">${escapeHtml(entry.surahName)} ${entry.surah}:${entry.verse} (Word #${entry.wordPos})</span>
+          </div>
+          <span class="mistake-time-tag">${formatMistakeTimestamp(entry.timestamp)}</span>
+        </div>
+
+        <div class="mistake-item-main">
+          <div class="mistake-word-trans-block">
+            <span class="mistake-word-trans">${escapeHtml(entry.wordTrans || '—')}</span>
+            ${entry.wordTranslit ? `<span class="mistake-word-translit">${escapeHtml(entry.wordTranslit)}</span>` : ''}
+          </div>
+          <div class="mistake-arabic-word ${isActive ? 'highlight-mistake' : ''}">${escapeHtml(entry.wordArabic || entry.wordPlain || '—')}</div>
+        </div>
+
+        <div class="mistake-item-actions">
+          <button type="button" class="btn-item-jump" onclick="jumpToMistakeAyah(${entry.surah}, ${entry.verse}, ${entry.wordPos})" title="Go to this verse in reader">
+            ▷ Jump to Ayah
+          </button>
+          <button type="button" class="btn-item-toggle-mistake ${isActive ? 'is-marked' : 'is-cleared'}" onclick="toggleMistakeFromHistory(${entry.surah}, ${entry.verse}, ${entry.wordPos})" title="${isActive ? 'Clear mistake flag' : 'Mark as mistake again'}">
+            ${isActive ? '✓ Clear Flag' : '🚩 Re-flag Mistake'}
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  mistakeHistoryList.innerHTML = html;
+}
+
+function jumpToMistakeAyah(surahNum, verseNum, wordPos) {
+  closeMistakeHistoryModal();
+  if (isLibraryView) {
+    hideLibraryView();
+  }
+
+  const navigateToTarget = () => {
+    if (typeof window.switchToAyah === 'function') {
+      window.switchToAyah(verseNum, false);
+    }
+    setTimeout(() => {
+      let targetEl = null;
+      if (wordPos) {
+        targetEl = document.querySelector(`.mushaf-word[data-verse-num="${verseNum}"][data-word-idx="${wordPos - 1}"]`);
+      }
+      if (!targetEl) {
+        targetEl = document.querySelector(`.reading-verse-span[data-verse-num="${verseNum}"], .vbv-verse-span[data-verse-num="${verseNum}"]`);
+      }
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl.classList.add('word-highlight-pulse');
+        setTimeout(() => targetEl.classList.remove('word-highlight-pulse'), 2500);
+      }
+    }, 200);
+  };
+
+  if (currentSurahNumber !== surahNum) {
+    loadSurah(surahNum).then(() => {
+      setTimeout(navigateToTarget, 150);
+    });
+  } else {
+    navigateToTarget();
+  }
+}
+
+function toggleMistakeFromHistory(surahNum, verseNum, wordPos) {
+  toggleWordMistake(surahNum, verseNum, wordPos);
+  renderMistakeHistoryModal();
+}
+
+function clearMistakeHistoryLog() {
+  if (confirm('Are you sure you want to clear your entire mistake history log?')) {
+    mistakeHistoryStore = [];
+    saveMistakeHistory();
+    renderMistakeHistoryModal();
+    showToastNotification('🗑️ Mistake history log cleared');
+  }
+}
+
+function practiceMistakesFromHistory() {
+  const activeKeys = Object.keys(memorizeMistakes || {});
+  if (activeKeys.length === 0) {
+    showToastNotification('No active mistakes flagged to practice!');
+    return;
+  }
+  closeMistakeHistoryModal();
+  if (isLibraryView) hideLibraryView();
+  if (!isMemorizeMode) toggleMemorizeMode();
+  setReviewMode(true);
+
+  let targetKey = activeKeys.find(k => k.startsWith(`${currentSurahNumber}:`)) || activeKeys[0];
+  const parts = targetKey.split(':');
+  const s = parseInt(parts[0]);
+  const v = parseInt(parts[1]);
+  const w = parseInt(parts[2]);
+
+  jumpToMistakeAyah(s, v, w);
+  showToastNotification(`⚡ Practice mode active: focusing troubled verse ${s}:${v}`);
+}
+
+window.openMistakeHistoryModal = openMistakeHistoryModal;
+window.closeMistakeHistoryModal = closeMistakeHistoryModal;
+window.jumpToMistakeAyah = jumpToMistakeAyah;
+window.toggleMistakeFromHistory = toggleMistakeFromHistory;
+
+// =========================================================
 // QURAN SURAH LIBRARY (HOME VIEW)
 // =========================================================
 
@@ -817,7 +1200,7 @@ function renderSurahLibrary() {
       ${totalDue > 0 ? `<span class="lib-stat-pill stat-due">⚡ ${totalDue} Due</span>` : `<span class="lib-stat-pill">⚡ 0 Due</span>`}
       <span class="lib-stat-pill stat-new">✨ ${totalNew} New</span>
       <span class="lib-stat-pill stat-mastery">🎯 ${overallMastery}% Mastered (${matureAyahs}/${totalQuranAyahs})</span>
-      ${totalMistakes > 0 ? `<span class="lib-stat-pill stat-mistakes">🚩 ${totalMistakes} Mistakes</span>` : ''}
+      ${totalMistakes > 0 ? `<span class="lib-stat-pill stat-mistakes" style="cursor:pointer;" onclick="openMistakeHistoryModal()" title="View Mistake History">🚩 ${totalMistakes} Mistakes</span>` : ''}
       ${totalNotes > 0 ? `<span class="lib-stat-pill stat-notes">📝 ${totalNotes} Notes</span>` : ''}
     `;
   }
@@ -2056,6 +2439,7 @@ function toggleWordMistake(surahNum, verseNum, wordPos) {
   const key = `${surahNum}:${verseNum}:${wordPos}`;
   if (memorizeMistakes[key]) {
     delete memorizeMistakes[key];
+    recordMistakeHistoryEntry(surahNum, verseNum, wordPos, 'cleared');
     showToastNotification(`✓ Cleared mistake on ${surahNum}:${verseNum} #${wordPos}`);
   } else {
     memorizeMistakes[key] = {
@@ -2064,6 +2448,7 @@ function toggleWordMistake(surahNum, verseNum, wordPos) {
       verse: verseNum,
       wordPos: wordPos
     };
+    recordMistakeHistoryEntry(surahNum, verseNum, wordPos, 'marked');
     showToastNotification(`🚩 Marked mistake on ${surahNum}:${verseNum} #${wordPos}`);
   }
   saveMistakes(memorizeMistakes);
@@ -3013,6 +3398,14 @@ if (ctxItemMultiSelect) {
   });
 }
 
+if (ctxItemMistakeHistory) {
+  ctxItemMistakeHistory.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hideWordTooltip();
+    openMistakeHistoryModal();
+  });
+}
+
 // Multi-Select Mode Functions & Action Handlers
 function startMultiSelectMode(initialWordEl = null, initialWordKey = null) {
   isMultiSelectMode = true;
@@ -3162,12 +3555,15 @@ if (msApplyMistakeBtn) {
       const w = parseInt(parts[2]);
       if (anyUnmarked) {
         memorizeMistakes[key] = { timestamp: Date.now(), surah: s, verse: v, wordPos: w };
+        recordMistakeHistoryEntry(s, v, w, 'marked', null, false);
       } else {
         delete memorizeMistakes[key];
+        recordMistakeHistoryEntry(s, v, w, 'cleared', null, false);
       }
     });
 
     saveMistakes(memorizeMistakes);
+    saveMistakeHistory();
     updateWordElementsMistakeClasses();
     updateActiveMistakeButtonState();
     updateMemorizeOverridesStats();
@@ -3273,6 +3669,13 @@ if (ayahCtxNote) {
   });
 }
 
+if (ayahCtxMistakeHistory) {
+  ayahCtxMistakeHistory.addEventListener('click', () => {
+    hideAyahContextMenu();
+    openMistakeHistoryModal();
+  });
+}
+
 // Ayah Note Modal Event Listeners
 if (btnCloseAyahNoteModal) btnCloseAyahNoteModal.addEventListener('click', closeAyahNoteModal);
 if (btnCancelAyahNote) btnCancelAyahNote.addEventListener('click', closeAyahNoteModal);
@@ -3281,6 +3684,75 @@ if (btnDeleteAyahNote) btnDeleteAyahNote.addEventListener('click', deleteCurrent
 if (ayahNoteModal) {
   ayahNoteModal.addEventListener('click', (e) => {
     if (e.target === ayahNoteModal) closeAyahNoteModal();
+  });
+}
+
+// Mistake History Modal Event Listeners
+if (btnCloseMistakeHistoryModal) btnCloseMistakeHistoryModal.addEventListener('click', closeMistakeHistoryModal);
+if (btnCloseMistakeHistoryFooter) btnCloseMistakeHistoryFooter.addEventListener('click', closeMistakeHistoryModal);
+if (mistakeHistoryModal) {
+  mistakeHistoryModal.addEventListener('click', (e) => {
+    if (e.target === mistakeHistoryModal) closeMistakeHistoryModal();
+  });
+}
+
+if (mistakeFilterChips) {
+  mistakeFilterChips.addEventListener('click', (e) => {
+    const chip = e.target.closest('.m-chip');
+    if (!chip) return;
+    mistakeFilterChips.querySelectorAll('.m-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    currentMistakeFilter = chip.getAttribute('data-filter') || 'all';
+    renderMistakeHistoryModal();
+  });
+}
+
+if (mistakeSearchInput) {
+  mistakeSearchInput.addEventListener('input', (e) => {
+    currentMistakeSearch = e.target.value;
+    if (btnClearMistakeSearch) {
+      btnClearMistakeSearch.style.display = currentMistakeSearch ? 'inline-flex' : 'none';
+    }
+    renderMistakeHistoryModal();
+  });
+}
+
+if (btnClearMistakeSearch) {
+  btnClearMistakeSearch.addEventListener('click', () => {
+    if (mistakeSearchInput) mistakeSearchInput.value = '';
+    currentMistakeSearch = '';
+    btnClearMistakeSearch.style.display = 'none';
+    renderMistakeHistoryModal();
+  });
+}
+
+if (mistakeSortSelect) {
+  mistakeSortSelect.addEventListener('change', (e) => {
+    currentMistakeSort = e.target.value;
+    renderMistakeHistoryModal();
+  });
+}
+
+if (btnClearMistakeHistoryLog) {
+  btnClearMistakeHistoryLog.addEventListener('click', clearMistakeHistoryLog);
+}
+
+if (btnPracticeMistakes) {
+  btnPracticeMistakes.addEventListener('click', practiceMistakesFromHistory);
+}
+
+if (btnLibOpenMistakeHistory) {
+  btnLibOpenMistakeHistory.addEventListener('click', (e) => {
+    e.preventDefault();
+    openMistakeHistoryModal();
+  });
+}
+
+if (btnOpenMistakeHistoryDrawer) {
+  btnOpenMistakeHistoryDrawer.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (typeof closeSettings === 'function') closeSettings();
+    openMistakeHistoryModal();
   });
 }
 
@@ -3323,6 +3795,10 @@ if (libFilterChips) {
   libFilterChips.addEventListener('click', (e) => {
     const chip = e.target.closest('.lib-chip');
     if (!chip) return;
+    if (chip.id === 'btnLibOpenMistakeHistory') {
+      openMistakeHistoryModal();
+      return;
+    }
     libFilterChips.querySelectorAll('.lib-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     currentLibraryFilter = chip.getAttribute('data-filter') || 'all';
@@ -3578,11 +4054,17 @@ if (btnClearSurahMistakes) {
     let count = 0;
     Object.keys(memorizeMistakes).forEach(key => {
       if (key.startsWith(`${currentSurahNumber}:`)) {
+        const parts = key.split(':');
+        const s = parseInt(parts[0]);
+        const v = parseInt(parts[1]);
+        const w = parseInt(parts[2]);
+        recordMistakeHistoryEntry(s, v, w, 'cleared', null, false);
         delete memorizeMistakes[key];
         count++;
       }
     });
     saveMistakes(memorizeMistakes);
+    saveMistakeHistory();
     updateWordElementsMistakeClasses();
     updateActiveMistakeButtonState();
     updateMemorizeOverridesStats();
@@ -4998,6 +5480,7 @@ function generateSyncPayload() {
     exportDate: new Date().toISOString(),
     fsrsCards: fsrsCardStore || {},
     mistakes: memorizeMistakes || {},
+    mistakeHistory: mistakeHistoryStore || [],
     notes: ayahNotesStore || {},
     wordVisOverrides: wordVisOverrides || {},
     ayahVisOverrides: ayahVisOverrides || {},
@@ -5136,6 +5619,10 @@ function importSyncData(inputData) {
       if (data.mistakes && typeof data.mistakes === 'object') {
         Object.assign(memorizeMistakes, data.mistakes);
         saveMistakes(memorizeMistakes);
+      }
+      if (Array.isArray(data.mistakeHistory)) {
+        mistakeHistoryStore = data.mistakeHistory;
+        saveMistakeHistory();
       }
       if (data.notes && typeof data.notes === 'object') {
         Object.assign(ayahNotesStore, data.notes);
@@ -5946,6 +6433,7 @@ if (initReciterSelect) {
   initReciterSelect.value = selectedReciter;
 }
 
+initMistakeHistory();
 initAyahNotes();
 initChapters();
 checkUrlHashSync();
