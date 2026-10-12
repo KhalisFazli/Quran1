@@ -34,6 +34,9 @@
   <!-- Top Sticky Header (Image 2 Layout) -->
   <header class="top-header">
     <div class="surah-picker">
+      <button class="header-sq-btn btn-home-library active" id="btnHomeLibrary" title="Quran Surah Library (Home)">
+        <span style="font-size:1.05rem; line-height:1;">🏛️</span>
+      </button>
       <button class="surah-select-btn" id="surahSelectBtn">
         <span id="headerSurahTitle">76. Al-Insaan</span>
         <span class="chevron-arrow">▾</span>
@@ -98,7 +101,37 @@
 
   <!-- Reading Container -->
   <main class="mushaf-container">
-    <section class="surah-banner" id="surahBanner">
+    <!-- Quran Surah Library (First Page / Home View) -->
+    <section class="surah-library-view" id="surahLibraryView">
+      <div class="library-header-banner">
+        <div class="lib-banner-title">
+          <h2>القرآن الكريم • Quran Surah Library</h2>
+          <p>114 Surahs • Track your memorization, FSRS reviews, notes & mistakes</p>
+        </div>
+        <div class="lib-stats-summary" id="libStatsSummary"></div>
+      </div>
+
+      <div class="library-toolbar">
+        <div class="lib-search-box">
+          <span class="lib-search-icon">🔍</span>
+          <input type="text" id="libSearchInput" placeholder="Search Surah by name, number, or translation..." />
+          <button type="button" class="lib-clear-btn" id="libClearSearchBtn" style="display:none;">✕</button>
+        </div>
+        <div class="lib-filter-chips" id="libFilterChips">
+          <button type="button" class="lib-chip active" data-filter="all">All (114)</button>
+          <button type="button" class="lib-chip" data-filter="due">⚡ Due</button>
+          <button type="button" class="lib-chip" data-filter="new">✨ New</button>
+          <button type="button" class="lib-chip" data-filter="mistakes">🚩 Mistakes</button>
+          <button type="button" class="lib-chip" data-filter="notes">📝 Notes</button>
+          <button type="button" class="lib-chip" data-filter="meccan">Meccan</button>
+          <button type="button" class="lib-chip" data-filter="medinan">Medinan</button>
+        </div>
+      </div>
+
+      <div class="library-surah-grid" id="librarySurahGrid"></div>
+    </section>
+
+    <section class="surah-banner" id="surahBanner" style="display:none;">
       <div class="banner-top">
         <div class="arabic-title-calligraphy" id="bannerArabicCalligraphy">الإِنسَـٰن</div>
         <div class="banner-title">
@@ -112,46 +145,39 @@
     </section>
 
     <!-- Standalone Bismillah -->
-    <section class="bismillah-block" id="bismillahBlock">
+    <section class="bismillah-block" id="bismillahBlock" style="display:none;">
       <div class="bismillah-calligraphy">بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ</div>
       <div class="bismillah-translation">In the Name of Allah—the Most Compassionate, Most Merciful</div>
     </section>
 
     <!-- Reading Mode Flow -->
-    <div id="readingView"></div>
+    <div id="readingView" style="display:none;"></div>
 
     <!-- Verse by Verse View -->
     <div id="vbvView" style="display: none;"></div>
   </main>
 
-  <!-- Memorize Mode Control Bar (Image 2 Layout: Clean 50%/50% split with center divider and top-right 4 circle buttons) -->
+  <!-- Memorize Mode Control Bar (Matching Image 1: Top Arch Tab Buttons Row + Divider + 50/50 Tap Zones) -->
   <div class="memorize-bar-container" id="memorizeBar">
-    <!-- Left Half: Unreveal Zone (50%) -->
-    <button type="button" class="mem-zone-btn mem-zone-unreveal" id="memUnrevealZoneBtn" title="Unreveal previous word (Tap or hold)">
-    </button>
-
-    <!-- Center Vertical Divider (Image 2) -->
-    <div class="mem-center-divider"></div>
-
-    <!-- Right Half: Container (50%) with 4 Circle Action Buttons on Top-Right & Reveal Zone -->
-    <div class="mem-right-section">
+    <!-- Top Row of Arch Tab Buttons (Image 1) -->
+    <div class="mem-top-tabs-bar">
       <div class="mem-actions-group" id="memActionsGroup">
-        <!-- 1. Rosette Numbers Toggle (Active dark circle in Image 2) -->
-        <button type="button" class="mem-circle-btn active" id="memToggleAyahNumBtn" title="Toggle Ayah Numbers Always Visible">
-          ۝
+        <!-- 1. Rosette Numbers Toggle (Active dark arch in Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn active" id="memToggleAyahNumBtn" title="Toggle Ayah Numbers Always Visible">
+          <span>۝</span>
         </button>
 
-        <!-- 2. Harakat / Diacritics Toggle (Active dark circle in Image 2) -->
-        <button type="button" class="mem-circle-btn active" id="memToggleHarakatBtn" title="Toggle Diacritics (Harakat)">
-          َُِ
+        <!-- 2. Harakat / Diacritics Toggle (Active dark arch in Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn active" id="memToggleHarakatBtn" title="Toggle Diacritics (Harakat)">
+          <span>َُِ</span>
         </button>
 
-        <!-- 3. Auto-reveal Play Button with 1x Badge (Light circle in Image 2) -->
-        <div style="position: relative;">
-          <button type="button" class="mem-circle-btn" id="memPlayRevealBtn" title="Auto Reveal Play / Pause">
+        <!-- 3. Auto-reveal Play Button with 1x Badge (Image 1) -->
+        <div class="mem-arch-wrapper" style="position: relative;">
+          <button type="button" class="mem-arch-btn mem-circle-btn" id="memPlayRevealBtn" title="Auto Reveal Play / Pause">
             <span id="memPlayIcon">▶</span>
+            <span class="mem-speed-badge-btn mem-speed-badge" id="memSpeedBadge" title="Change Speed (Click to select 0.5x - 2x)">1x</span>
           </button>
-          <button type="button" class="mem-speed-badge-btn" id="memSpeedBadge" title="Change Speed (Click to select 0.5x - 2x)">1x</button>
 
           <div class="mem-speed-popover" id="memSpeedPopover">
             <div class="mem-speed-title">Reveal Speed</div>
@@ -163,32 +189,59 @@
           </div>
         </div>
 
-        <!-- 4. Reveal/Hide All Toggle (Light circle in Image 2) -->
-        <button type="button" class="mem-circle-btn" id="memToggleRevealAllBtn" title="Reveal / Hide All">
+        <!-- 4. Reveal/Hide All Toggle (Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleRevealAllBtn" title="Reveal / Hide All">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
             <circle cx="12" cy="12" r="3"></circle>
           </svg>
         </button>
 
-        <!-- 5. Word FSRS Grade Mode Toggle -->
-        <button type="button" class="mem-circle-btn" id="memToggleGradeBtn" title="Grade Mode (FSRS Spaced Repetition) - Click Ayah rosette to grade words">
+        <!-- 5. Word FSRS Grade Mode Toggle (Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleGradeBtn" title="Grade Mode (FSRS Spaced Repetition) - Click Ayah rosette to grade words">
           <span style="font-size:0.95rem; line-height:1;">🎓</span>
         </button>
 
-        <!-- 6. Mark Mistake Button -->
-        <button type="button" class="mem-circle-btn" id="memMarkMistakeBtn" title="Mark Mistake (Click: flag active word • Hold/Shift-click: Mistake Mode)">
+        <!-- 6. Mark Mistake Button (Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memMarkMistakeBtn" title="Mark Mistake (Click: flag active word • Hold/Shift-click: Mistake Mode)">
           <span style="font-size:0.95rem; line-height:1;">🚩</span>
         </button>
 
-        <!-- 7. Review Mode Toggle (Only New & Due words hidden) -->
-        <button type="button" class="mem-circle-btn" id="memToggleReviewBtn" title="Review Mode (Only New & Due words are hidden; mastered words stay visible)">
+        <!-- 7. Review Mode Toggle (Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleReviewBtn" title="Review Mode (Only New & Due words are hidden; mastered words stay visible)">
           <span style="font-size:0.95rem; line-height:1;">⚡</span>
         </button>
 
-        <!-- 8. Voice Recorder & Playback Toggle -->
-        <button type="button" class="mem-circle-btn" id="memVoiceRecBtn" title="Voice Recorder: Record your recitation and play it back">
+        <!-- 8. Voice Recorder & Playback Toggle (Image 1) -->
+        <button type="button" class="mem-arch-btn mem-circle-btn" id="memVoiceRecBtn" title="Voice Recorder: Record your recitation and play it back">
           <span style="font-size:0.95rem; line-height:1;">🎙️</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Horizontal Divider Line (Image 1) -->
+    <div class="mem-horizontal-divider"></div>
+
+    <!-- Lower Tap Zones Area with Center Ayah Navigation Buttons (Image 2) -->
+    <div class="mem-tap-zones-area">
+      <!-- Left Half Tap Zone: Unreveal Previous Word -->
+      <button type="button" class="mem-zone-btn mem-zone-unreveal" id="memUnrevealZoneBtn" title="Unreveal previous word (Tap or hold)">
+      </button>
+
+      <!-- Center Ayah Navigation Group: Previous Ayah (↑), Center Divider, Next Ayah (↓) (Image 2) -->
+      <div class="mem-center-nav-cluster">
+        <button type="button" class="mem-ayah-nav-btn btn-prev-ayah" id="memPrevAyahBtn" title="Previous Ayah (↑)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="19" x2="12" y2="5"></line>
+            <polyline points="5 12 12 5 19 12"></polyline>
+          </svg>
+        </button>
+        <div class="mem-center-divider"></div>
+        <button type="button" class="mem-ayah-nav-btn btn-next-ayah" id="memNextAyahBtn" title="Next Ayah (↓)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <polyline points="19 12 12 19 5 12"></polyline>
+          </svg>
         </button>
       </div>
 
@@ -213,21 +266,27 @@
         </div>
       </div>
 
-      <!-- AUDIO BAR 1: Ayah Audio (Qari) [Active when Ayah audio is ON] -->
+      <!-- AUDIO BAR 1: Ayah Audio (Reciter) [Active when Ayah audio is ON] -->
       <div class="voice-rec-audio-row qari-audio-row" id="voiceRecQariRow" style="display:none;">
         <div class="voice-rec-row-header">
           <span class="voice-rec-row-label">
             <span class="rec-row-icon">🔊</span>
-            <span id="voiceRecQariLabel">Ayah Audio (Qari)</span>
+            <span id="voiceRecQariLabel">Ayah Audio (Reciter)</span>
           </span>
           <div class="voice-rec-row-meta">
+            <!-- Reciter Volume Slider -->
+            <div class="voice-vol-control" title="Reciter Volume">
+              <span class="vol-icon">🔉</span>
+              <input type="range" class="voice-vol-slider" id="reciterVolSlider" min="0" max="1" step="0.05" value="0.8" />
+              <span class="vol-val" id="reciterVolVal">80%</span>
+            </div>
             <span class="voice-rec-row-time" id="voiceQariTimeDisplay">00:00 / 00:00</span>
             <button type="button" class="voice-row-close-btn" id="btnCloseAyahAudioBar" title="Turn Ayah Audio Off">✕</button>
           </div>
         </div>
         <div class="voice-rec-bar-container">
-          <button type="button" class="voice-mini-play-btn qari-mini-btn" id="btnVoiceQariPlayMini" title="Play / Pause Ayah Audio">▶</button>
-          <div class="voice-rec-playback-track qari-track" id="voiceRecQariTrack" title="Click to seek Ayah audio">
+          <button type="button" class="voice-mini-play-btn qari-mini-btn" id="btnVoiceQariPlayMini" title="Play / Pause Reciter Audio">▶</button>
+          <div class="voice-rec-playback-track qari-track" id="voiceRecQariTrack" title="Click or drag to seek reciter audio">
             <div class="voice-rec-progress qari-progress" id="voiceRecQariProgress" style="width:0%;"></div>
           </div>
         </div>
@@ -240,11 +299,19 @@
             <span class="rec-row-icon">🎙️</span>
             <span>My Recording</span>
           </span>
-          <span class="voice-rec-row-time" id="voiceUserTimeDisplay">00:00</span>
+          <div class="voice-rec-row-meta">
+            <!-- Voice Volume Slider -->
+            <div class="voice-vol-control" title="Recorded Voice Volume">
+              <span class="vol-icon">🔉</span>
+              <input type="range" class="voice-vol-slider" id="voiceVolSlider" min="0" max="1" step="0.05" value="1.0" />
+              <span class="vol-val" id="voiceVolVal">100%</span>
+            </div>
+            <span class="voice-rec-row-time" id="voiceUserTimeDisplay">00:00</span>
+          </div>
         </div>
         <div class="voice-rec-bar-container">
           <button type="button" class="voice-mini-play-btn user-mini-btn" id="btnVoiceUserPlayMini" title="Play / Pause My Voice" disabled>▶</button>
-          <div class="voice-rec-playback-track user-track" id="voiceRecPlaybackTrack" title="Click to seek recording">
+          <div class="voice-rec-playback-track user-track" id="voiceRecPlaybackTrack" title="Click or drag to seek recording">
             <div class="voice-rec-progress user-progress" id="voiceRecProgress" style="width:0%;"></div>
           </div>
         </div>
@@ -260,7 +327,11 @@
           <span class="voice-btn-icon" id="voicePlayIcon">▶</span>
           <span id="voicePlayBtnText">Play Voice</span>
         </button>
-        <button type="button" class="voice-btn voice-btn-qari" id="btnVoiceCompareQari" title="Toggle Ayah Audio (Qari)">
+        <button type="button" class="voice-btn voice-btn-both" id="btnVoicePlayBoth" title="Play Both Voice and Reciter at the same time" disabled>
+          <span class="voice-btn-icon" id="voicePlayBothIcon">▶▶</span>
+          <span id="voicePlayBothText">Play Both</span>
+        </button>
+        <button type="button" class="voice-btn voice-btn-qari" id="btnVoiceCompareQari" title="Toggle Ayah Audio (Reciter)">
           <span class="voice-btn-icon" id="voiceQariBtnIcon">🔊</span>
           <span id="voiceQariBtnText">Ayah Audio</span>
         </button>
@@ -318,6 +389,60 @@
           <span>Reset Visibility</span>
         </div>
       </div>
+      <hr class="ctx-divider" />
+      <div class="ctx-item" id="ctxItemMultiSelect" title="Select multiple words to mark mistakes or pin visibility">
+        <div class="ctx-item-left">
+          <span style="font-size:0.95rem;">☑️</span>
+          <span>Select Multiple Words...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Multi-Select Toolbar -->
+  <div class="multi-select-toolbar" id="multiSelectToolbar" style="display:none;">
+    <div class="multi-select-content">
+      <div class="multi-select-header-row">
+        <div class="multi-select-title-group">
+          <span class="multi-select-icon">☑️</span>
+          <span class="multi-select-status" id="multiSelectStatus">Multi-Select Words</span>
+          <span class="multi-select-count-badge" id="multiSelectCountBadge">0 selected</span>
+        </div>
+        <div class="multi-select-top-actions">
+          <button type="button" class="ms-pill-btn" id="msSelectAyahBtn" title="Select all words in current Ayah">Select Ayah</button>
+          <button type="button" class="ms-pill-btn" id="msClearBtn" title="Clear selection">Clear</button>
+          <button type="button" class="ms-close-btn" id="msCloseBtn" title="Exit Multi-Select Mode">✕</button>
+        </div>
+      </div>
+
+      <!-- Mode Selector Pills -->
+      <div class="multi-select-mode-row">
+        <span class="ms-mode-label">Tap action:</span>
+        <button type="button" class="ms-mode-pill active" id="msModeSelect" data-mode="select">☑️ Select</button>
+        <button type="button" class="ms-mode-pill" id="msModeMistake" data-mode="mistake">🚩 Mark Mistake</button>
+        <button type="button" class="ms-mode-pill" id="msModeVisible" data-mode="visible">📌 Always Visible</button>
+        <button type="button" class="ms-mode-pill" id="msModeHidden" data-mode="hidden">🙈 Always Hidden</button>
+      </div>
+
+      <!-- Batch Action Buttons on Selected Words -->
+      <div class="multi-select-actions-row">
+        <button type="button" class="ms-action-btn ms-btn-mistake" id="msApplyMistakeBtn" title="Mark selected words as mistakes">
+          <span>🚩</span>
+          <span>Mark Mistake</span>
+        </button>
+        <button type="button" class="ms-action-btn ms-btn-vis" id="msApplyVisibleBtn" title="Pin selected words as Always Visible">
+          <span>📌</span>
+          <span>Always Visible</span>
+        </button>
+        <button type="button" class="ms-action-btn ms-btn-hidden" id="msApplyHiddenBtn" title="Pin selected words as Always Hidden">
+          <span>🙈</span>
+          <span>Always Hidden</span>
+        </button>
+        <button type="button" class="ms-action-btn ms-btn-reset" id="msApplyResetBtn" title="Reset visibility for selected words">
+          <span>↺</span>
+          <span>Reset</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -353,6 +478,38 @@
       <div class="ctx-item-left">
         <span style="font-size:0.95rem;">▶</span>
         <span>Play Ayah</span>
+      </div>
+    </div>
+    <div class="ctx-item" id="ayahCtxNote" title="Add or edit reflection note for this Ayah">
+      <div class="ctx-item-left">
+        <span style="font-size:0.95rem;">📝</span>
+        <span id="ayahCtxNoteLabel">Add / Edit Note</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ayah Note Modal Dialog -->
+  <div class="ayah-note-modal-overlay" id="ayahNoteModal" style="display:none;">
+    <div class="ayah-note-card">
+      <div class="ayah-note-header">
+        <div class="ayah-note-title-wrap">
+          <span class="ayah-note-icon">📝</span>
+          <div>
+            <h3 id="ayahNoteTitle">Ayah Reflection & Notes</h3>
+            <span class="ayah-note-sub" id="ayahNoteSub">Surah 76:1</span>
+          </div>
+        </div>
+        <button type="button" class="ayah-note-close" id="btnCloseAyahNoteModal" title="Close">✕</button>
+      </div>
+      <div class="ayah-note-preview" id="ayahNoteVersePreview"></div>
+      <div class="ayah-note-body">
+        <textarea id="ayahNoteTextarea" placeholder="Write your reflection, tafsir note, or memorization reminder for this Ayah..."></textarea>
+      </div>
+      <div class="ayah-note-footer">
+        <button type="button" class="ayah-note-btn btn-delete-note" id="btnDeleteAyahNote" style="display:none;">🗑️ Delete</button>
+        <div style="flex:1;"></div>
+        <button type="button" class="ayah-note-btn btn-cancel-note" id="btnCancelAyahNote">Cancel</button>
+        <button type="button" class="ayah-note-btn btn-save-note" id="btnSaveAyahNote">💾 Save Note</button>
       </div>
     </div>
   </div>
@@ -464,10 +621,16 @@
               </div>
               <span class="menu-arrow">›</span>
               <div class="submenu-panel" id="submenuReciter">
-                <div class="submenu-option active" data-reciter="ar.alafasy">Mishari Al-Afasy</div>
-                <div class="submenu-option" data-reciter="ar.abdulbasitmurattal">Abdul Basit (Murattal)</div>
-                <div class="submenu-option" data-reciter="ar.husary">Mahmoud Al-Husary</div>
-                <div class="submenu-option" data-reciter="ar.minshawi">Mohamed Al-Minshawi</div>
+                <div class="submenu-option" data-reciter="Abdullah_Basfar_192kbps">Abdullah Basfar</div>
+                <div class="submenu-option" data-reciter="Abu_Bakr_Ash-Shaatree_128kbps">Abu Bakr Ash-Shaatree</div>
+                <div class="submenu-option" data-reciter="Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net">Ahmed ibn Ali al-Ajamy</div>
+                <div class="submenu-option active" data-reciter="Alafasy_128kbps">Alafasy</div>
+                <div class="submenu-option" data-reciter="Ghamadi_40kbps">Ghamadi</div>
+                <div class="submenu-option" data-reciter="Hani_Rifai_192kbps">Hani Rifai</div>
+                <div class="submenu-option" data-reciter="Husary_128kbps">Husary</div>
+                <div class="submenu-option" data-reciter="Husary_Muallim_128kbps">Husary (Muallim)</div>
+                <div class="submenu-option" data-reciter="Nabil_Rifa3i_48kbps">Nabil_Rifa3i</div>
+                <div class="submenu-option" data-reciter="Yasser_Ad-Dussary_128kbps">Yasser_Ad-Dussary</div>
               </div>
             </div>
           </div>
@@ -850,6 +1013,26 @@
           <span id="lineHeightDisplay">2.4</span>
           <button class="step-btn" id="lineHeightIncBtn" title="Wider line spacing">+</button>
         </div>
+      </div>
+
+      <div class="settings-section-title">Audio & Reciter</div>
+
+      <div class="setting-toggle-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+        <span class="setting-toggle-label">
+          <span>🎙️</span> Choose Reciter
+        </span>
+        <select class="setting-dropdown-select" id="settingsReciterSelect" style="width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-line, #dcd0bc); background: var(--bg-card, #fff); font-size: 0.88rem; color: var(--text-main, #2b2e35); cursor: pointer;">
+          <option value="Abdullah_Basfar_192kbps">Abdullah Basfar</option>
+          <option value="Abu_Bakr_Ash-Shaatree_128kbps">Abu Bakr Ash-Shaatree</option>
+          <option value="Ahmed_ibn_Ali_al-Ajamy_128kbps_ketaballah.net">Ahmed ibn Ali al-Ajamy</option>
+          <option value="Alafasy_128kbps" selected>Alafasy</option>
+          <option value="Ghamadi_40kbps">Ghamadi</option>
+          <option value="Hani_Rifai_192kbps">Hani Rifai</option>
+          <option value="Husary_128kbps">Husary</option>
+          <option value="Husary_Muallim_128kbps">Husary (Muallim)</option>
+          <option value="Nabil_Rifa3i_48kbps">Nabil_Rifa3i</option>
+          <option value="Yasser_Ad-Dussary_128kbps">Yasser_Ad-Dussary</option>
+        </select>
       </div>
 
       <div class="settings-section-title">Verse By Verse Display</div>

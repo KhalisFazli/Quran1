@@ -392,9 +392,21 @@ body {
 }
 
 .ayah-active-span {
-  background-color: rgba(234, 179, 8, 0.22);
-  border-radius: 6px;
-  padding: 3px 6px;
+  background-color: transparent !important;
+}
+
+/* Ayah Rosette Highlight for Active Ayah (No yellow highlight on words) */
+.reading-verse-span.ayah-active-span .ayah-marker,
+.ayah-marker.active-ayah-marker {
+  filter: drop-shadow(0 0 7px rgba(217, 119, 6, 0.95)) !important;
+  transform: scale(1.18) !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.reading-verse-span.ayah-active-span .ayah-marker .ayah-rosette-svg {
+  color: #b45309 !important;
 }
 
 /* --- Word Display & Memorize Mode (Pure Empty Space) --- */
@@ -613,7 +625,10 @@ body.review-mode-active .mushaf-word.review-mastered-visible {
   background: transparent !important;
   border: none !important;
   user-select: none !important;
-  cursor: pointer;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  display: inline-block !important;
+  min-width: 16px;
 }
 .ayah-marker.ayah-persist-visible {
   box-shadow: 0 0 0 2px #10b981;
@@ -732,19 +747,17 @@ body.mistake-mode-active .mushaf-word {
 .wd-trans-source { font-size: 0.78rem; color: var(--text-muted); }
 .wd-actions-footer { display: flex; gap: 1.5rem; margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-muted); }
 
-/* --- Memorize Mode Control Bar (Image 2 Layout: Flush Bottom Dock, Center Line, 4 Circles) --- */
+/* --- Memorize Mode Control Bar (Image 1 Layout: Top Arch Tab Buttons + Horizontal Divider + 50/50 Tap Zones) --- */
 .memorize-bar-container {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   width: 100%;
-  height: 110px;
   background: #fdf9f0;
-  border-top: 1px solid #ebdcc4;
-  box-shadow: 0 -3px 15px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   z-index: 180;
   transform: translateY(105%);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -752,6 +765,115 @@ body.mistake-mode-active .mushaf-word {
 }
 .memorize-bar-container.show {
   transform: translateY(0);
+}
+
+/* Top Tab Bar containing Arch Buttons (Matching Image 1) */
+.mem-top-tabs-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  padding-top: 6px;
+  background: #fdf9f0;
+}
+
+.mem-actions-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  z-index: 10;
+  padding: 0 8px;
+}
+
+/* Arch / Tombstone Tab Buttons (Image 1 Shape: curved top, sits flat on horizontal divider) */
+.mem-arch-btn, .mem-circle-btn {
+  width: 36px;
+  height: 42px;
+  border-radius: 14px 14px 0 0;
+  background: #ede3ce;
+  border: 1px solid #dfd3ba;
+  border-bottom: none;
+  color: #1e2229;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.92rem;
+  transition: all 0.15s ease;
+  position: relative;
+  padding: 0;
+  user-select: none;
+  outline: none;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.mem-arch-btn:hover, .mem-circle-btn:hover {
+  background: #f5ece0;
+  transform: translateY(-2px);
+}
+
+/* Active arch buttons in Image 1 (Rosette & Harakat: dark charcoal arch with white text) */
+.mem-arch-btn.active, .mem-circle-btn.active {
+  background: #23272f !important;
+  border-color: #1a1e24 !important;
+  color: #ffffff !important;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.mem-arch-btn.active:hover, .mem-circle-btn.active:hover {
+  background: #181b21 !important;
+}
+
+.mem-arch-btn svg, .mem-circle-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 1x Badge on Button 3 (Matching Image 1: small black tag at base of Play triangle) */
+.mem-arch-btn .mem-speed-badge-btn,
+.mem-arch-btn .mem-speed-badge,
+.mem-circle-btn .mem-speed-badge-btn,
+.mem-circle-btn .mem-speed-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e2229;
+  color: #ffffff;
+  font-size: 7.5px;
+  font-weight: 800;
+  padding: 0 4px;
+  border-radius: 4px;
+  line-height: 1.2;
+  border: 1px solid #ede3ce;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.mem-arch-btn.active .mem-speed-badge-btn,
+.mem-arch-btn.active .mem-speed-badge {
+  background: #ffffff;
+  color: #1e2229;
+  border-color: #1e2229;
+}
+
+/* Continuous Horizontal Divider Line (Matching Image 1) */
+.mem-horizontal-divider {
+  width: 100%;
+  height: 1px;
+  background: #ebdcc4;
+  z-index: 5;
+}
+
+/* Lower Tap Zones Area (Matching Image 1: 50% left unreveal, 50% right reveal, center vertical divider) */
+.mem-tap-zones-area {
+  display: flex;
+  align-items: stretch;
+  position: relative;
+  height: 78px;
+  width: 100%;
 }
 
 .mem-zone-btn {
@@ -764,7 +886,7 @@ body.mistake-mode-active .mushaf-word {
   transition: background 0.12s;
   outline: none;
 }
-.mem-zone-btn:active { background: rgba(0, 0, 0, 0.03); }
+.mem-zone-btn:active { background: rgba(0, 0, 0, 0.025); }
 
 /* Left 50%: Unreveal zone */
 .mem-zone-unreveal {
@@ -772,95 +894,74 @@ body.mistake-mode-active .mushaf-word {
   flex: 0 0 50%;
 }
 
-/* Center vertical line dividing left and right 50/50 (Matching Image 2) */
-.mem-center-divider {
-  position: absolute;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  width: 2px;
-  height: 52px;
-  background: #232220;
-  border-radius: 1px;
-  pointer-events: none;
-}
-
-/* Right 50%: Container with Top-Right Action Circles + Full-Size Reveal Button */
-.mem-right-section {
+/* Right 50%: Reveal zone */
+.mem-zone-reveal {
   width: 50%;
   flex: 0 0 50%;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 
-.mem-zone-reveal {
-  width: 100%;
-  height: 100%;
-}
-
-/* Top-Right 4 Circles Group (Matching Image 2) */
-/* Top-Right 4 Circles Group (Smaller refined buttons matching Image 1 request) */
-.mem-actions-group {
+/* Center Ayah Navigation Group (Image 2: Previous Ayah ↑, Center Divider, Next Ayah ↓) */
+.mem-center-nav-cluster {
   position: absolute;
-  top: 10px;
-  right: 14px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
-  gap: 5px;
-  z-index: 10;
-  max-width: calc(100% - 20px);
+  gap: 12px;
+  z-index: 25;
+  pointer-events: auto;
 }
 
-.mem-circle-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #faf4e6;
-  border: 1.2px solid #dacbb0;
+.mem-center-divider {
+  width: 2px;
+  height: 48px;
+  background: #232220;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.mem-ayah-nav-btn {
+  width: 40px;
+  height: 52px;
+  border-radius: 12px;
+  background: #ede3ce;
+  border: 1px solid #dfd3ba;
   color: #1e2229;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 0.82rem;
-  transition: all 0.15s;
-  position: relative;
+  transition: all 0.15s ease;
+  user-select: none;
+  outline: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   padding: 0;
 }
-.mem-circle-btn:hover {
-  background: #ffffff;
-  transform: scale(1.08);
+
+.mem-ayah-nav-btn:hover {
+  background: #f5ece0;
+  border-color: #cbbe9f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.09);
 }
 
-.mem-circle-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* Active buttons in Image 2 (Rosette and Harakat active: dark charcoal circle with white symbol) */
-.mem-circle-btn.active {
-  background: #1e2229;
+.mem-ayah-nav-btn:active {
+  background: #23272f;
   color: #ffffff;
-  border-color: #1e2229;
+  border-color: #1a1e24;
+  transform: translateY(0);
 }
 
-.mem-speed-badge-btn, .mem-speed-badge {
-  position: absolute;
-  bottom: -3px;
-  right: -5px;
-  background: #1e2229;
-  color: #ffffff;
-  font-size: 8px;
-  font-weight: 700;
-  padding: 0 3px;
-  border-radius: 5px;
-  line-height: 1.1;
-  border: 1px solid #faf4e6;
-  cursor: pointer;
-  z-index: 5;
-  transition: transform 0.12s, background 0.12s;
+.mem-ayah-nav-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  transition: transform 0.15s ease;
+}
+
+.mem-ayah-nav-btn:hover svg {
+  transform: scale(1.15);
 }
 .mem-speed-badge-btn:hover, .mem-speed-badge:hover {
   background: #333942;
@@ -966,11 +1067,11 @@ body.mistake-mode-active .mushaf-word {
 
 /* Show audio bar in memorize mode stacked cleanly above the memorize dock */
 body.memorize-active .audio-bar-wrapper {
-  bottom: 110px;
+  bottom: 127px;
   z-index: 195;
 }
 body.memorize-active .audio-bar-wrapper.minimized {
-  bottom: 110px !important;
+  bottom: 127px !important;
   z-index: 150 !important;
 }
 
@@ -1122,13 +1223,16 @@ body.memorize-active .audio-bar-wrapper.minimized {
   position: absolute;
   bottom: 0;
   left: 102%;
-  width: 230px;
+  width: 250px;
+  max-height: 290px;
+  overflow-y: auto;
   background: #faf4e7;
   border: 1px solid #ebdcc4;
   border-radius: 12px;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
   padding: 6px;
   z-index: 260;
+  scrollbar-width: thin;
 }
 .menu-item.open-sub .submenu-panel { display: block; }
 .submenu-option {
@@ -2788,6 +2892,77 @@ body.grade-mode-active .ayah-marker:hover {
   gap: 8px;
 }
 
+/* Volume Sliders for Dual Audio */
+.voice-vol-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.voice-vol-control .vol-icon {
+  font-size: 0.72rem;
+  line-height: 1;
+  color: #94a3b8;
+}
+
+.voice-vol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 50px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.voice-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #38bdf8;
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease;
+}
+
+.voice-vol-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.voice-vol-slider::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: none;
+  border-radius: 50%;
+  background: #38bdf8;
+  cursor: pointer;
+}
+
+#voiceVolSlider::-webkit-slider-thumb {
+  background: #10b981;
+}
+
+#voiceVolSlider::-moz-range-thumb {
+  background: #10b981;
+}
+
+.voice-vol-control .vol-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  min-width: 28px;
+  text-align: right;
+}
+
 .voice-rec-row-time {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.74rem;
@@ -2959,6 +3134,30 @@ body.grade-mode-active .ayah-marker:hover {
   border-color: #10b981 !important;
 }
 
+.voice-btn-both {
+  background: rgba(168, 85, 247, 0.15);
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.voice-btn-both:not(:disabled):hover {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: #a855f7;
+  color: #ffffff;
+}
+
+.voice-btn-both.playing {
+  background: #7e22ce !important;
+  color: #ffffff !important;
+  border-color: #c084fc !important;
+  animation: pulseBothBtn 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseBothBtn {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.6); }
+  50% { box-shadow: 0 0 0 7px rgba(168, 85, 247, 0); }
+}
+
 .voice-btn-qari {
   background: rgba(59, 130, 246, 0.15);
   color: #93c5fd;
@@ -3033,10 +3232,17 @@ body.grade-mode-active .ayah-marker:hover {
   animation: pulseRecBtn 1.5s infinite ease-in-out;
 }
 
+body.memorize-active .voice-recorder-hud {
+  bottom: 132px;
+}
+
 @media (max-width: 480px) {
   .voice-recorder-hud {
     bottom: 74px;
     width: 96%;
+  }
+  body.memorize-active .voice-recorder-hud {
+    bottom: 128px;
   }
   .voice-recorder-card {
     padding: 8px 10px;
@@ -3048,5 +3254,876 @@ body.grade-mode-active .ayah-marker:hover {
   }
 }
 
+/* =========================================================
+   FLOATING MULTI-SELECT TOOLBAR (Image 1 Multi-Select Mode)
+   ========================================================= */
+.multi-select-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 530px;
+  background: rgba(254, 252, 247, 0.98);
+  backdrop-filter: blur(12px);
+  border: 1px solid #decab0;
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 3px 10px rgba(0, 0, 0, 0.08);
+  z-index: 1050;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  animation: msSlideUp 0.2s ease-out;
+}
 
+@keyframes msSlideUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+body.memorize-active .multi-select-toolbar {
+  bottom: 135px;
+}
+
+.multi-select-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.multi-select-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.multi-select-title-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #3b2c17;
+}
+
+.multi-select-count-badge {
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.multi-select-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ms-pill-btn {
+  background: #f0e6d6;
+  border: 1px solid #d9c4a8;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4a3b29;
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ms-pill-btn:hover {
+  background: #e2d2bb;
+}
+
+.ms-close-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: #887864;
+  cursor: pointer;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.ms-close-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #222;
+}
+
+.multi-select-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding-bottom: 7px;
+  border-bottom: 1px dashed #ebdcc4;
+}
+
+.ms-mode-label {
+  font-size: 0.73rem;
+  color: #8c7860;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.ms-mode-pill {
+  background: #f7efe1;
+  border: 1px solid #decbb2;
+  border-radius: 18px;
+  font-size: 0.73rem;
+  color: #554430;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.ms-mode-pill:hover {
+  background: #eee0cc;
+}
+
+.ms-mode-pill.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #1d4ed8;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.multi-select-actions-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.ms-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.ms-btn-mistake {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.ms-btn-mistake:hover {
+  background: #fecaca;
+}
+
+.ms-btn-vis {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+.ms-btn-vis:hover {
+  background: #d1fae5;
+}
+
+.ms-btn-hidden {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+.ms-btn-hidden:hover {
+  background: #fde68a;
+}
+
+.ms-btn-reset {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #d1d5db;
+}
+.ms-btn-reset:hover {
+  background: #e5e7eb;
+}
+
+/* Word highlight when selected in multi-select mode */
+.mushaf-word.word-multiselected {
+  outline: 2.5px solid #2563eb !important;
+  outline-offset: 2px;
+  background-color: rgba(37, 99, 235, 0.16) !important;
+  border-radius: 4px;
+}
+
+.mushaf-word.word-multiselected.memorize-hidden,
+.mushaf-word.word-multiselected.persist-hidden {
+  outline: 2.5px dashed #2563eb !important;
+  background-color: rgba(37, 99, 235, 0.18) !important;
+}
+
+@media (max-width: 480px) {
+  .multi-select-toolbar {
+    bottom: 74px;
+    width: 96%;
+    padding: 10px 11px;
+  }
+  body.memorize-active .multi-select-toolbar {
+    bottom: 128px;
+  }
+  .ms-action-btn {
+    font-size: 0.7rem;
+    padding: 6px 2px;
+  }
+}
+
+/* =========================================================
+   TOP HEADER HOME / LIBRARY BUTTON
+   ========================================================= */
+.btn-home-library {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.btn-home-library:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.btn-home-library.active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* =========================================================
+   QURAN SURAH LIBRARY (HOME VIEW)
+   ========================================================= */
+.surah-library-view {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0.5rem 0.75rem 5rem;
+  box-sizing: border-box;
+  animation: fadeInLib 0.25s ease-out;
+}
+
+@keyframes fadeInLib {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.library-header-banner {
+  background: linear-gradient(135deg, #fdfbf7 0%, #f7f1e5 100%);
+  border: 1px solid #ebdcc4;
+  border-radius: 16px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+
+.lib-banner-title h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #3b2c17;
+  font-family: var(--font-ui);
+}
+
+.lib-banner-title p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #7c6853;
+}
+
+.lib-stats-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 1rem;
+}
+
+.lib-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ffffff;
+  border: 1px solid #e5d5be;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4a3b29;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.lib-stat-pill.stat-due {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+
+.lib-stat-pill.stat-new {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.lib-stat-pill.stat-mastery {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+
+.lib-stat-pill.stat-mistakes {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.lib-stat-pill.stat-notes {
+  background: #fefce8;
+  border-color: #fef08a;
+  color: #a16207;
+}
+
+.library-toolbar {
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lib-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.lib-search-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 0.95rem;
+  color: #8c7860;
+  pointer-events: none;
+}
+
+.lib-search-box input {
+  width: 100%;
+  padding: 10px 36px 10px 40px;
+  background: #ffffff;
+  border: 1px solid #decab0;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-family: var(--font-ui);
+  color: #2b2319;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.lib-search-box input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.lib-clear-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  color: #8c7860;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.lib-filter-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.lib-filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.lib-chip {
+  background: #fdfaf5;
+  border: 1px solid #decab0;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #5c4832;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.lib-chip:hover {
+  background: #f7ede0;
+}
+
+.lib-chip.active {
+  background: #23272f;
+  color: #ffffff;
+  border-color: #1a1e24;
+}
+
+/* Surah Cards Grid */
+.library-surah-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+
+.lib-surah-card {
+  background: #ffffff;
+  border: 1px solid #ebdcc4;
+  border-radius: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  user-select: none;
+}
+
+.lib-surah-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  border-color: #c9af88;
+}
+
+.lib-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lib-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lib-surah-num {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #f7efe1;
+  border: 1px solid #ebdcc4;
+  color: #634f37;
+  font-weight: 700;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lib-card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.lib-english-name {
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #2b2319;
+  line-height: 1.25;
+}
+
+.lib-translation-sub {
+  font-size: 0.76rem;
+  color: #8c7860;
+  margin-top: 1px;
+}
+
+.lib-type-meta {
+  font-size: 0.72rem;
+  color: #a3907a;
+  margin-top: 1px;
+}
+
+.lib-arabic-name {
+  font-family: var(--font-arabic);
+  font-size: 1.45rem;
+  color: #2c251d;
+  line-height: 1.2;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.lib-kpi-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.lib-kpi-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  line-height: 1.3;
+}
+
+.lib-kpi-badge.badge-due {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+}
+
+.lib-kpi-badge.badge-new {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.lib-kpi-badge.badge-mistake {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.lib-kpi-badge.badge-notes {
+  background: #fefce8;
+  color: #a16207;
+  border: 1px solid #fef08a;
+}
+
+.lib-mastery-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lib-mastery-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7c6853;
+}
+
+.lib-mastery-track {
+  width: 100%;
+  height: 6px;
+  background: #f0e7d8;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lib-mastery-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* =========================================================
+   AYAH NOTES FEATURE & MODAL
+   ========================================================= */
+.ayah-note-indicator {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+  z-index: 5;
+  transition: transform 0.15s ease;
+}
+
+.ayah-marker:hover .ayah-note-indicator {
+  transform: translateX(-50%) scale(1.15);
+}
+
+.ayah-note-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(5px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  animation: fadeInModal 0.18s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ayah-note-card {
+  width: 100%;
+  max-width: 520px;
+  background: #fdfbf7;
+  border: 1px solid #ebdcc4;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ayah-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #ebdcc4;
+  background: #f7efe1;
+}
+
+.ayah-note-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ayah-note-icon {
+  font-size: 1.25rem;
+}
+
+.ayah-note-title-wrap h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #3b2c17;
+}
+
+.ayah-note-sub {
+  font-size: 0.75rem;
+  color: #8c7860;
+  font-weight: 500;
+}
+
+.ayah-note-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: #8c7860;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.ayah-note-close:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #111;
+}
+
+.ayah-note-preview {
+  padding: 12px 18px;
+  background: #fbf7ee;
+  border-bottom: 1px solid #ebdcc4;
+  font-family: var(--font-arabic);
+  font-size: 1.25rem;
+  color: #2b2319;
+  text-align: right;
+  direction: rtl;
+  max-height: 100px;
+  overflow-y: auto;
+  line-height: 1.8;
+}
+
+.ayah-note-body {
+  padding: 16px 18px;
+}
+
+.ayah-note-body textarea {
+  width: 100%;
+  height: 150px;
+  padding: 12px;
+  border: 1px solid #decab0;
+  border-radius: 10px;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #2b2319;
+  background: #ffffff;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ayah-note-body textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.ayah-note-footer {
+  display: flex;
+  align-items: center;
+  padding: 12px 18px;
+  border-top: 1px solid #ebdcc4;
+  background: #f7efe1;
+  gap: 8px;
+}
+
+.ayah-note-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.btn-save-note {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #1d4ed8;
+}
+
+.btn-save-note:hover {
+  background: #1d4ed8;
+}
+
+.btn-cancel-note {
+  background: #ffffff;
+  color: #4a3b29;
+  border-color: #decab0;
+}
+
+.btn-cancel-note:hover {
+  background: #f0e6d6;
+}
+
+.btn-delete-note {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+
+.btn-delete-note:hover {
+  background: #fecaca;
+}
+
+/* VBV Note Block & Buttons */
+.vbv-btn-note {
+  background: #f7efe1;
+  border: 1px solid #decab0;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 0.78rem;
+  color: #5c4832;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.vbv-btn-note:hover {
+  background: #ede0cb;
+}
+
+.vbv-btn-note.has-note {
+  background: #fef3c7;
+  border-color: #fde68a;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.vbv-note-box {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.85rem;
+  color: #78350f;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+/* =========================================================
+   VERSE BY VERSE (VBV) IN MEMORIZE MODE
+   ========================================================= */
+body.memorize-active .vbv-card {
+  border-color: #e5d5be;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+body.memorize-active .vbv-card.vbv-active-card {
+  border-color: #d97706 !important;
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.25), 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+body.memorize-active .vbv-arabic .mushaf-word {
+  margin: 0 2px;
+}
+
+body.memorize-active .vbv-arabic .mushaf-word.memorize-hidden {
+  color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  user-select: none;
+  cursor: pointer;
+}
+
+body.memorize-active .vbv-trans-hidden {
+  filter: blur(5px);
+  user-select: none;
+  opacity: 0.35;
+  transition: filter 0.25s, opacity 0.25s;
+  cursor: pointer;
+}
+
+body.memorize-active .vbv-trans-hidden:hover {
+  filter: blur(0);
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .library-surah-grid {
+    grid-template-columns: 1fr;
+  }
+  .library-header-banner {
+    padding: 1.1rem 1.25rem;
+  }
+  .lib-banner-title h2 {
+    font-size: 1.2rem;
+  }
+}
 
