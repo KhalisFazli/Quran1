@@ -600,57 +600,22 @@ function getRosetteSvg(number) {
   const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
   const noteIndicator = hasNote ? `<span class="ayah-note-indicator" title="Has Reflection / Note">📝</span>` : '';
 
-  const card = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
-  const lastGradedStr = (card && card.last_review) ? getLastGradedTimeStr(card.last_review, true) : '';
-  const ratingClass = (card && card.last_rating) ? `rating-${card.last_rating}` : 'rating-3';
-  const gradedBadge = lastGradedStr
-    ? `<span class="ayah-graded-time-badge ${ratingClass}" title="Last graded ${lastGradedStr} ago">${lastGradedStr}</span>`
-    : '';
-  const markerTitle = lastGradedStr
-    ? `Ayah ${number} • Last graded: ${lastGradedStr} ago (Click for options)`
-    : `Ayah ${number} (Click for options)`;
-
   return `
     <span class="ayah-marker ${isHidden ? 'hidden-ayah' : ''} ${overrideClass}" 
           data-verse="${number}" 
           id="ayah-marker-${number}"
-          title="${markerTitle}">
+          title="Ayah ${number} (Click for options)">
       <svg class="ayah-rosette-svg" viewBox="0 0 60 60">
         <use href="#ayah-rosette-sym" />
       </svg>
       <span class="ayah-number-text ${lenClass}">${arabicNum}</span>
       ${noteIndicator}
-      ${gradedBadge}
     </span>
   `;
 }
 
 function updateAyahGradedBadges() {
-  if (!surahData || !surahData.verses) return;
-  const markers = document.querySelectorAll('.ayah-marker');
-  markers.forEach(marker => {
-    const vNum = parseInt(marker.getAttribute('data-verse'));
-    if (!vNum) return;
-    const ayahKey = `${currentSurahNumber}:${vNum}`;
-    const card = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
-    const lastGradedStr = (card && card.last_review) ? getLastGradedTimeStr(card.last_review, true) : '';
-    const ratingClass = (card && card.last_rating) ? `rating-${card.last_rating}` : 'rating-3';
-
-    let existingBadge = marker.querySelector('.ayah-graded-time-badge');
-    if (lastGradedStr) {
-      if (!existingBadge) {
-        existingBadge = document.createElement('span');
-        marker.appendChild(existingBadge);
-      }
-      existingBadge.className = `ayah-graded-time-badge ${ratingClass}`;
-      existingBadge.textContent = lastGradedStr;
-      existingBadge.title = `Last graded ${lastGradedStr} ago`;
-      marker.title = `Ayah ${vNum} • Last graded: ${lastGradedStr} ago (Click for options)`;
-    } else if (existingBadge) {
-      existingBadge.remove();
-      marker.title = `Ayah ${vNum} (Click for options)`;
-    }
-  });
+  // No-op: last graded time is displayed only inside the Grade window
 }
 
 // =========================================================
@@ -2113,12 +2078,6 @@ function renderVbvView() {
     const ayahKey = `${meta.number}:${verse.verseNumber}`;
     const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
     const noteText = hasNote ? ayahNotesStore[ayahKey] : '';
-    const vCard = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
-    const vLastGraded = (vCard && vCard.last_review) ? getLastGradedTimeStr(vCard.last_review, false) : '';
-    const vRatingClass = (vCard && vCard.last_rating) ? `rating-${vCard.last_rating}` : 'rating-3';
-    const vbvGradedHtml = vLastGraded
-      ? `<span class="vbv-graded-badge ${vRatingClass}" onclick="openAyahGradingModal(${meta.number}, ${verse.verseNumber})" title="Last graded ${vLastGraded} ago (Click to grade)">⏱️ ${vLastGraded}</span>`
-      : '';
 
     html += `
       <div class="vbv-card" id="vbv-card-${idx}">
@@ -2127,7 +2086,6 @@ function renderVbvView() {
             <span>${meta.number}:${verse.verseNumber}</span>
             <button class="vbv-btn" onclick="playAyah(${idx})" title="Play Verse">▷</button>
             <button class="vbv-btn vbv-btn-note ${hasNote ? 'has-note' : ''}" onclick="openAyahNoteModal(${meta.number}, ${verse.verseNumber})" title="${hasNote ? 'Edit Reflection' : 'Add Note'}">📝</button>
-            ${vbvGradedHtml}
           </div>
         </div>
 
@@ -3005,13 +2963,8 @@ function setAyahVisibilityOverride(surahNum, verseNum, state) {
 function showAyahContextMenu(verseNum, x, y) {
   activeAyahContextVerse = verseNum;
   const ayahKey = `${currentSurahNumber}:${verseNum}`;
-  const card = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
-  const lastGradedStr = (card && card.last_review) ? getLastGradedTimeStr(card.last_review, false) : '';
-
   if (ayahCtxHeader) {
-    ayahCtxHeader.textContent = lastGradedStr
-      ? `Ayah ${currentSurahNumber}:${verseNum} • Graded ${lastGradedStr} ago`
-      : `Ayah ${currentSurahNumber}:${verseNum}`;
+    ayahCtxHeader.textContent = `Ayah ${currentSurahNumber}:${verseNum}`;
   }
 
   const override = ayahVisOverrides[ayahKey];
@@ -5514,19 +5467,18 @@ function renderGradingModal() {
   if (gradingAyahStatus) {
     gradingAyahStatus.className = 'compact-status-badge';
     const lastGradedStr = card.last_review ? getLastGradedTimeStr(card.last_review, false) : '';
-    const gradedPart = lastGradedStr ? `Graded ${lastGradedStr} ago • ` : '';
-    if (card.state === FSRS_STATE.NEW) {
+    if (card.state === FSRS_STATE.NEW || !lastGradedStr) {
       gradingAyahStatus.classList.add('state-new');
       gradingAyahStatus.textContent = 'New';
     } else if (card.state === FSRS_STATE.LEARNING) {
       gradingAyahStatus.classList.add('state-learning');
-      gradingAyahStatus.textContent = `Learning • ${gradedPart}Due ${getDueTimeStr(card.due)}`;
+      gradingAyahStatus.textContent = `Graded ${lastGradedStr} ago`;
     } else if (card.state === FSRS_STATE.REVIEW) {
       gradingAyahStatus.classList.add('state-review');
-      gradingAyahStatus.textContent = `Review • ${gradedPart}S:${card.stability}d • Due ${getDueTimeStr(card.due)}`;
+      gradingAyahStatus.textContent = `Graded ${lastGradedStr} ago`;
     } else if (card.state === FSRS_STATE.RELEARNING) {
       gradingAyahStatus.classList.add('state-relearning');
-      gradingAyahStatus.textContent = `Lapsed • ${gradedPart}Due ${getDueTimeStr(card.due)}`;
+      gradingAyahStatus.textContent = `Graded ${lastGradedStr} ago`;
     }
   }
 
@@ -5883,7 +5835,7 @@ function renderFsrsBrowser() {
             <td>${badgeHtml}</td>
             <td>${c.stability ? `${c.stability}d` : '—'}</td>
             <td>${c.difficulty ? `${c.difficulty}` : '—'}</td>
-            <td>${isNew ? 'Ready to study' : `${getDueTimeStr(c.due)}${c.last_review ? ` <span style="color:#64748b;font-size:0.75rem;">(graded ${getLastGradedTimeStr(c.last_review, false)} ago)</span>` : ''}`}</td>
+            <td>${isNew ? 'Ready to study' : getDueTimeStr(c.due)}</td>
             <td>${c.reps || 0}</td>
             <td>
               <div style="display:flex; gap:4px;">
