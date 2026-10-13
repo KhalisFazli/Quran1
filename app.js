@@ -79,8 +79,9 @@ let activeAyahNoteTarget = null; // { surahNum, verseNum }
 let holdInterval = null;
 let holdTimeout = null;
 
-// Repeat Logic
-let repeatMode = 'range';
+// Repeat Logic (Default off: do not auto-advance unless specified in repeat setting)
+let isRepeatActive = false;
+let repeatMode = 'off';
 let rangeStart = 1;
 let rangeEnd = 31;
 let playRangeCount = Infinity;
@@ -219,6 +220,7 @@ const ctxItemMore = document.getElementById('ctxItemMore');
 const ctxItemPlayWord = document.getElementById('ctxItemPlayWord');
 const ctxItemToggleMistake = document.getElementById('ctxItemToggleMistake');
 const ctxMistakeLabel = document.getElementById('ctxMistakeLabel');
+const ctxItemClearMistake = document.getElementById('ctxItemClearMistake');
 const ctxItemPinVisible = document.getElementById('ctxItemPinVisible');
 const ctxItemPinHidden = document.getElementById('ctxItemPinHidden');
 const ctxItemResetVisibility = document.getElementById('ctxItemResetVisibility');
@@ -555,6 +557,23 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function getLastGradedTimeStr(lastReviewIso, compact = false) {
+  if (!lastReviewIso) return '';
+  const revTime = new Date(lastReviewIso).getTime();
+  if (isNaN(revTime)) return '';
+  const diffMs = Math.max(0, Date.now() - revTime);
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return compact ? '1m' : 'just now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(diffMs / 3600000);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(diffMs / 86400000);
+  if (days === 1) return '1 day';
+  if (days < 30) return `${days} days`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? '1 mo' : `${months} mos`;
+}
+
 function getRosetteSvg(number) {
   const arabicNum = toArabicDigits(number);
   const ayahKey = `${currentSurahNumber}:${number}`;
@@ -578,18 +597,58 @@ function getRosetteSvg(number) {
   const lenClass = number >= 100 ? 'digits-3' : '';
   const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
   const noteIndicator = hasNote ? `<span class="ayah-note-indicator" title="Has Reflection / Note">📝</span>` : '';
+
+  const card = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
+  const lastGradedStr = (card && card.last_review) ? getLastGradedTimeStr(card.last_review, true) : '';
+  const ratingClass = (card && card.last_rating) ? `rating-${card.last_rating}` : 'rating-3';
+  const gradedBadge = lastGradedStr
+    ? `<span class="ayah-graded-time-badge ${ratingClass}" title="Last graded ${lastGradedStr} ago">${lastGradedStr}</span>`
+    : '';
+  const markerTitle = lastGradedStr
+    ? `Ayah ${number} • Last graded: ${lastGradedStr} ago (Click for options)`
+    : `Ayah ${number} (Click for options)`;
+
   return `
     <span class="ayah-marker ${isHidden ? 'hidden-ayah' : ''} ${overrideClass}" 
           data-verse="${number}" 
           id="ayah-marker-${number}"
-          title="Ayah ${number} (Click for options)">
+          title="${markerTitle}">
       <svg class="ayah-rosette-svg" viewBox="0 0 60 60">
         <use href="#ayah-rosette-sym" />
       </svg>
       <span class="ayah-number-text ${lenClass}">${arabicNum}</span>
       ${noteIndicator}
+      ${gradedBadge}
     </span>
   `;
+}
+
+function updateAyahGradedBadges() {
+  if (!surahData || !surahData.verses) return;
+  const markers = document.querySelectorAll('.ayah-marker');
+  markers.forEach(marker => {
+    const vNum = parseInt(marker.getAttribute('data-verse'));
+    if (!vNum) return;
+    const ayahKey = `${currentSurahNumber}:${vNum}`;
+    const card = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
+    const lastGradedStr = (card && card.last_review) ? getLastGradedTimeStr(card.last_review, true) : '';
+    const ratingClass = (card && card.last_rating) ? `rating-${card.last_rating}` : 'rating-3';
+
+    let existingBadge = marker.querySelector('.ayah-graded-time-badge');
+    if (lastGradedStr) {
+      if (!existingBadge) {
+        existingBadge = document.createElement('span');
+        marker.appendChild(existingBadge);
+      }
+      existingBadge.className = `ayah-graded-time-badge ${ratingClass}`;
+      existingBadge.textContent = lastGradedStr;
+      existingBadge.title = `Last graded ${lastGradedStr} ago`;
+      marker.title = `Ayah ${vNum} • Last graded: ${lastGradedStr} ago (Click for options)`;
+    } else if (existingBadge) {
+      existingBadge.remove();
+      marker.title = `Ayah ${vNum} (Click for options)`;
+    }
+  });
 }
 
 // =========================================================
@@ -808,6 +867,38 @@ function getSurahNameFallback(sNum) {
   return `Surah ${sNum}`;
 }
 
+function reconcileMistakesFromHistory() {
+  if (!mistakeHistoryStore || mistakeHistoryStore.length === 0) return;
+  const latestByWord = new Map();
+  const markCountByWord = new Map();
+
+  mistakeHistoryStore.forEach(entry => {
+    if (!entry || !entry.wordKey) return;
+    if (entry.action === 'marked') {
+      markCountByWord.set(entry.wordKey, (markCountByWord.get(entry.wordKey) || 0) + 1);
+    }
+    const existing = latestByWord.get(entry.wordKey);
+    if (!existing || (entry.timestamp || 0) >= (existing.timestamp || 0)) {
+      latestByWord.set(entry.wordKey, entry);
+    }
+  });
+
+  latestByWord.forEach((latestEntry, wordKey) => {
+    if (latestEntry.action === 'cleared') {
+      delete memorizeMistakes[wordKey];
+    } else if (latestEntry.action === 'marked') {
+      memorizeMistakes[wordKey] = {
+        timestamp: latestEntry.timestamp || Date.now(),
+        surah: latestEntry.surah,
+        verse: latestEntry.verse,
+        wordPos: latestEntry.wordPos,
+        count: markCountByWord.get(wordKey) || 1
+      };
+    }
+  });
+  saveMistakes(memorizeMistakes);
+}
+
 function initMistakeHistory() {
   mistakeHistoryStore = loadMistakeHistory();
   // Backfill if history is empty but active mistakes exist
@@ -824,6 +915,8 @@ function initMistakeHistory() {
       }
     });
     saveMistakeHistory();
+  } else {
+    reconcileMistakesFromHistory();
   }
   // Immediately enrich any missing words or translations
   enrichMistakeHistory().catch(err => console.warn('Init enrichment error:', err));
@@ -1210,9 +1303,14 @@ function renderMistakeHistoryModal() {
           <button type="button" class="btn-item-jump" onclick="jumpToMistakeAyah(${entry.surah}, ${entry.verse}, ${entry.wordPos})" title="Go to this verse in reader">
             ▷ Jump to Ayah
           </button>
-          <button type="button" class="btn-item-toggle-mistake ${isActive ? 'is-marked' : 'is-cleared'}" onclick="toggleMistakeFromHistory(${entry.surah}, ${entry.verse}, ${entry.wordPos})" title="${isActive ? 'Clear mistake flag' : 'Mark as mistake again'}">
-            ${isActive ? '✓ Clear Flag' : '🚩 Re-flag Mistake'}
+          <button type="button" class="btn-item-log-again" onclick="markMistakeFromHistory(${entry.surah}, ${entry.verse}, ${entry.wordPos})" title="Record this mistake again without removing the mark">
+            ${isActive ? '🚩 Log Again (+1)' : '🚩 Re-flag Mistake'}
           </button>
+          ${isActive ? `
+          <button type="button" class="btn-item-toggle-mistake is-marked" onclick="clearMistakeFromHistory(${entry.surah}, ${entry.verse}, ${entry.wordPos})" title="Clear / resolve mistake flag">
+            ✓ Clear Flag
+          </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1256,8 +1354,23 @@ function jumpToMistakeAyah(surahNum, verseNum, wordPos) {
   }
 }
 
+function markMistakeFromHistory(surahNum, verseNum, wordPos) {
+  markWordMistake(surahNum, verseNum, wordPos);
+  renderMistakeHistoryModal();
+}
+
+function clearMistakeFromHistory(surahNum, verseNum, wordPos) {
+  clearWordMistake(surahNum, verseNum, wordPos);
+  renderMistakeHistoryModal();
+}
+
 function toggleMistakeFromHistory(surahNum, verseNum, wordPos) {
-  toggleWordMistake(surahNum, verseNum, wordPos);
+  const key = `${surahNum}:${verseNum}:${wordPos}`;
+  if (memorizeMistakes && memorizeMistakes[key]) {
+    clearWordMistake(surahNum, verseNum, wordPos);
+  } else {
+    markWordMistake(surahNum, verseNum, wordPos);
+  }
   renderMistakeHistoryModal();
 }
 
@@ -1814,6 +1927,7 @@ async function loadSurah(num) {
 
     rangeStart = 1;
     rangeEnd = surahData.verses.length;
+    isRepeatActive = false;
     repeatFromVerse.value = `${num}:1`;
     repeatToVerse.value = `${num}:${surahData.verses.length}`;
 
@@ -1840,6 +1954,7 @@ async function loadSurah(num) {
       surahCache.set(cacheKey, surahData);
       rangeStart = 1;
       rangeEnd = surahData.verses.length;
+      isRepeatActive = false;
       repeatFromVerse.value = `${num}:1`;
       repeatToVerse.value = `${num}:${surahData.verses.length}`;
       updateBanner();
@@ -1993,6 +2108,12 @@ function renderVbvView() {
     const ayahKey = `${meta.number}:${verse.verseNumber}`;
     const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
     const noteText = hasNote ? ayahNotesStore[ayahKey] : '';
+    const vCard = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
+    const vLastGraded = (vCard && vCard.last_review) ? getLastGradedTimeStr(vCard.last_review, false) : '';
+    const vRatingClass = (vCard && vCard.last_rating) ? `rating-${vCard.last_rating}` : 'rating-3';
+    const vbvGradedHtml = vLastGraded
+      ? `<span class="vbv-graded-badge ${vRatingClass}" onclick="openAyahGradingModal(${meta.number}, ${verse.verseNumber})" title="Last graded ${vLastGraded} ago (Click to grade)">⏱️ ${vLastGraded}</span>`
+      : '';
 
     html += `
       <div class="vbv-card" id="vbv-card-${idx}">
@@ -2001,6 +2122,7 @@ function renderVbvView() {
             <span>${meta.number}:${verse.verseNumber}</span>
             <button class="vbv-btn" onclick="playAyah(${idx})" title="Play Verse">▷</button>
             <button class="vbv-btn vbv-btn-note ${hasNote ? 'has-note' : ''}" onclick="openAyahNoteModal(${meta.number}, ${verse.verseNumber})" title="${hasNote ? 'Edit Reflection' : 'Add Note'}">📝</button>
+            ${vbvGradedHtml}
           </div>
         </div>
 
@@ -2660,10 +2782,17 @@ if (toggleReviewMode) {
   });
 }
 
-// Mark Mistake Button Logic (Click: flag active word • Hold/Shift-click: Mistake Mode)
+// Mark Mistake Button Logic (Click: flag/log mistake on active word • Hold/Shift-click: Mistake Mode)
 if (memMarkMistakeBtn) {
+  let mistakeHoldTimer = null;
+  let mistakeHoldTriggered = false;
+
   memMarkMistakeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    if (mistakeHoldTriggered) {
+      mistakeHoldTriggered = false;
+      return;
+    }
     if (e.shiftKey) {
       toggleMistakeMode();
       return;
@@ -2672,21 +2801,22 @@ if (memMarkMistakeBtn) {
       const activeEl = totalWordElements[revealedWordCount - 1];
       const vNum = parseInt(activeEl.getAttribute('data-verse-num'));
       const wIdx = parseInt(activeEl.getAttribute('data-word-idx'));
-      toggleWordMistake(currentSurahNumber, vNum, wIdx + 1);
+      markWordMistake(currentSurahNumber, vNum, wIdx + 1);
     } else if (totalWordElements.length > 0) {
       const activeEl = totalWordElements[0];
       const vNum = parseInt(activeEl.getAttribute('data-verse-num'));
       const wIdx = parseInt(activeEl.getAttribute('data-word-idx'));
-      toggleWordMistake(currentSurahNumber, vNum, wIdx + 1);
+      markWordMistake(currentSurahNumber, vNum, wIdx + 1);
     } else {
       toggleMistakeMode();
     }
   });
 
-  let mistakeHoldTimer = null;
   memMarkMistakeBtn.addEventListener('mousedown', (e) => {
     e.stopPropagation();
+    mistakeHoldTriggered = false;
     mistakeHoldTimer = setTimeout(() => {
+      mistakeHoldTriggered = true;
       toggleMistakeMode();
     }, 400);
   });
@@ -2704,32 +2834,99 @@ function toggleMistakeMode() {
   document.body.classList.toggle('mistake-mode-active', isMistakeMode);
   updateActiveMistakeButtonState();
   if (isMistakeMode) {
-    showToastNotification('🚩 Mistake Mode ON: Click any word to mark or unmark mistake');
+    showToastNotification('🚩 Mistake Mode ON: Click any word to log a mistake');
   } else {
     showToastNotification('✓ Mistake Mode OFF');
   }
 }
 
-function toggleWordMistake(surahNum, verseNum, wordPos) {
+function markWordMistake(surahNum, verseNum, wordPos) {
   const key = `${surahNum}:${verseNum}:${wordPos}`;
-  if (memorizeMistakes[key]) {
-    delete memorizeMistakes[key];
-    recordMistakeHistoryEntry(surahNum, verseNum, wordPos, 'cleared');
-    showToastNotification(`✓ Cleared mistake on ${surahNum}:${verseNum} #${wordPos}`);
-  } else {
-    memorizeMistakes[key] = {
-      timestamp: Date.now(),
-      surah: surahNum,
-      verse: verseNum,
-      wordPos: wordPos
-    };
-    recordMistakeHistoryEntry(surahNum, verseNum, wordPos, 'marked');
-    showToastNotification(`🚩 Marked mistake on ${surahNum}:${verseNum} #${wordPos}`);
-  }
+  const wasAlreadyMarked = Boolean(memorizeMistakes[key]);
+  const prevCount = (memorizeMistakes[key] && memorizeMistakes[key].count) ? memorizeMistakes[key].count : (wasAlreadyMarked ? 1 : 0);
+  const newCount = prevCount + 1;
+
+  memorizeMistakes[key] = {
+    timestamp: Date.now(),
+    surah: surahNum,
+    verse: verseNum,
+    wordPos: wordPos,
+    count: newCount
+  };
+  recordMistakeHistoryEntry(surahNum, verseNum, wordPos, 'marked');
   saveMistakes(memorizeMistakes);
   updateWordElementsMistakeClasses();
   updateActiveMistakeButtonState();
   updateMemorizeOverridesStats();
+
+  // Count total times marked in history
+  const histCount = (mistakeHistoryStore || []).filter(e => e && e.wordKey === key && e.action === 'marked').length || newCount;
+  if (wasAlreadyMarked || histCount > 1) {
+    showToastNotification(`🚩 Mistake recorded again on ${surahNum}:${verseNum} #${wordPos} (${histCount}×)`);
+  } else {
+    showToastNotification(`🚩 Marked mistake on ${surahNum}:${verseNum} #${wordPos}`);
+  }
+
+  if (typeof scheduleGdriveAutoSync === 'function') {
+    scheduleGdriveAutoSync();
+  }
+}
+
+function clearWordMistake(surahNum, verseNum, wordPos) {
+  const key = `${surahNum}:${verseNum}:${wordPos}`;
+  if (memorizeMistakes[key]) {
+    delete memorizeMistakes[key];
+  }
+  recordMistakeHistoryEntry(surahNum, verseNum, wordPos, 'cleared');
+  saveMistakes(memorizeMistakes);
+  updateWordElementsMistakeClasses();
+  updateActiveMistakeButtonState();
+  updateMemorizeOverridesStats();
+  showToastNotification(`✓ Cleared mistake on ${surahNum}:${verseNum} #${wordPos}`);
+
+  if (typeof scheduleGdriveAutoSync === 'function') {
+    scheduleGdriveAutoSync();
+  }
+}
+
+function resolveAyahMistakes(surahNum, verseNum) {
+  if (!memorizeMistakes) return 0;
+  const prefix = `${surahNum}:${verseNum}:`;
+  const ayahKey = `${surahNum}:${verseNum}`;
+  let resolvedCount = 0;
+
+  Object.keys(memorizeMistakes).forEach(key => {
+    if (key === ayahKey || key.startsWith(prefix)) {
+      const parts = key.split(':');
+      const s = parseInt(parts[0]);
+      const v = parseInt(parts[1]);
+      const w = parseInt(parts[2]) || 1;
+      delete memorizeMistakes[key];
+      recordMistakeHistoryEntry(s, v, w, 'cleared', null, false);
+      resolvedCount++;
+    }
+  });
+
+  if (resolvedCount > 0) {
+    saveMistakes(memorizeMistakes);
+    saveMistakeHistory();
+    updateWordElementsMistakeClasses();
+    updateActiveMistakeButtonState();
+    updateMemorizeOverridesStats();
+    const modal = document.getElementById('mistakeHistoryModal');
+    if (modal && (modal.classList.contains('show') || modal.style.display === 'flex')) {
+      renderMistakeHistoryModal();
+    }
+    if (typeof scheduleGdriveAutoSync === 'function') {
+      scheduleGdriveAutoSync();
+    }
+  }
+  return resolvedCount;
+}
+
+function toggleWordMistake(surahNum, verseNum, wordPos) {
+  // Always mark / log repeat mistake without removing the existing mark
+  markWordMistake(surahNum, verseNum, wordPos);
 }
 
 function updateWordElementsMistakeClasses() {
@@ -2802,9 +2999,16 @@ function setAyahVisibilityOverride(surahNum, verseNum, state) {
 
 function showAyahContextMenu(verseNum, x, y) {
   activeAyahContextVerse = verseNum;
-  if (ayahCtxHeader) ayahCtxHeader.textContent = `Ayah ${currentSurahNumber}:${verseNum}`;
-
   const ayahKey = `${currentSurahNumber}:${verseNum}`;
+  const card = (typeof fsrsCardStore !== 'undefined' && fsrsCardStore) ? fsrsCardStore[ayahKey] : null;
+  const lastGradedStr = (card && card.last_review) ? getLastGradedTimeStr(card.last_review, false) : '';
+
+  if (ayahCtxHeader) {
+    ayahCtxHeader.textContent = lastGradedStr
+      ? `Ayah ${currentSurahNumber}:${verseNum} • Graded ${lastGradedStr} ago`
+      : `Ayah ${currentSurahNumber}:${verseNum}`;
+  }
+
   const override = ayahVisOverrides[ayahKey];
   if (ayahCtxPinVisible) ayahCtxPinVisible.classList.toggle('active', override === 'visible');
   if (ayahCtxPinHidden) ayahCtxPinHidden.classList.toggle('active', override === 'hidden');
@@ -3026,6 +3230,7 @@ function openAudioBar(forceUnminimize = false) {
 function closeAudioBar() {
   audioPlayer.pause();
   currentAudioIndex = -1;
+  isRepeatActive = false;
   mainPlayPauseBtn.textContent = '▶';
   btnListen.textContent = '▶';
   if (currentActiveSpan) {
@@ -3035,7 +3240,7 @@ function closeAudioBar() {
   minimizeAudioBar();
 }
 
-window.switchToAyah = function(targetAyah, autoPlayIfPlaying = true) {
+window.switchToAyah = function(targetAyah, autoPlayIfPlaying = false) {
   if (!surahData || !surahData.verses || !surahData.verses.length) return;
   const totalVerses = surahData.verses.length;
   if (targetAyah < 1) {
@@ -3078,15 +3283,18 @@ window.switchToAyah = function(targetAyah, autoPlayIfPlaying = true) {
     }
   }
 
-  // 3. Audio follow selection
+  // 3. Audio follow selection (do not auto-play next Ayah unless repeat is active & requested)
   const wasPlaying = audioPlayer && !audioPlayer.paused;
   currentAudioIndex = targetIndex;
   audioPlayer.src = targetVerse.audioUrl;
-  if (wasPlaying && autoPlayIfPlaying) {
+  if (wasPlaying && isRepeatActive && autoPlayIfPlaying) {
     safePlay(audioPlayer);
     if (mainPlayPauseBtn) mainPlayPauseBtn.textContent = '❚❚';
     if (btnListen) btnListen.textContent = '❚❚';
   } else {
+    if (wasPlaying) audioPlayer.pause();
+    if (mainPlayPauseBtn) mainPlayPauseBtn.textContent = '▶';
+    if (btnListen) btnListen.textContent = '▶';
     if (currentTimeDisplay) currentTimeDisplay.textContent = '00:00';
     if (progressFill) progressFill.style.width = '0%';
     if (progressHandle) progressHandle.style.left = '0%';
@@ -3154,12 +3362,34 @@ window.playAyah = function(index) {
 };
 
 audioPlayer.addEventListener('ended', () => {
+  // Do not auto-advance or loop unless repeat setting was explicitly started
+  if (!isRepeatActive || repeatMode === 'off') {
+    mainPlayPauseBtn.textContent = '▶';
+    btnListen.textContent = '▶';
+    if (typeof syncAyahAudioBar === 'function') syncAyahAudioBar();
+    return;
+  }
+
   if (currentVersePlayIteration < repeatVerseCount) {
     currentVersePlayIteration++;
     setTimeout(() => safePlay(audioPlayer), delaySeconds * 1000);
     return;
   }
   currentVersePlayIteration = 1;
+
+  // In single-Ayah repeat mode, never auto-advance to the next Ayah
+  if (repeatMode === 'single') {
+    if (playRangeCount === Infinity || currentRangeIteration < playRangeCount) {
+      currentRangeIteration++;
+      setTimeout(() => playAyah(currentAudioIndex >= 0 ? currentAudioIndex : rangeStart - 1), delaySeconds * 1000);
+    } else {
+      isRepeatActive = false;
+      mainPlayPauseBtn.textContent = '▶';
+      btnListen.textContent = '▶';
+      if (typeof syncAyahAudioBar === 'function') syncAyahAudioBar();
+    }
+    return;
+  }
 
   const nextIdx = currentAudioIndex + 1;
   const rangeEndIdx = rangeEnd - 1;
@@ -3171,6 +3401,7 @@ audioPlayer.addEventListener('ended', () => {
       currentRangeIteration++;
       setTimeout(() => playAyah(rangeStart - 1), delaySeconds * 1000);
     } else {
+      isRepeatActive = false;
       closeAudioBar();
     }
   }
@@ -3517,6 +3748,13 @@ repeatModalOverlay.addEventListener('click', (e) => {
 });
 
 repeatStartBtn.addEventListener('click', () => {
+  if (repeatMode === 'off') {
+    isRepeatActive = false;
+    repeatModalOverlay.classList.remove('show');
+    showToastNotification('Audio repeat & auto-next turned OFF');
+    return;
+  }
+
   if (repeatMode === 'single') {
     const parts = repeatFromVerse.value.split(':');
     rangeStart = parseInt(parts[1]) || 1;
@@ -3531,6 +3769,7 @@ repeatStartBtn.addEventListener('click', () => {
     rangeEnd = surahData.verses.length;
   }
 
+  isRepeatActive = true;
   currentVersePlayIteration = 1;
   currentRangeIteration = 1;
   repeatModalOverlay.classList.remove('show');
@@ -3579,7 +3818,10 @@ function showWordTooltip(wordEl, autoShowContextMenu = false) {
   const wordKey = `${currentSurahNumber}:${verse.verseNumber}:${wordPos}`;
 
   if (ctxMistakeLabel) {
-    ctxMistakeLabel.textContent = memorizeMistakes[wordKey] ? '✓ Clear Mistake (Flagged)' : '🚩 Mark as Mistake';
+    ctxMistakeLabel.textContent = memorizeMistakes[wordKey] ? 'Mark Mistake Again (+1)' : 'Mark as Mistake';
+  }
+  if (ctxItemClearMistake) {
+    ctxItemClearMistake.style.display = memorizeMistakes[wordKey] ? 'flex' : 'none';
   }
   const override = wordVisOverrides[wordKey];
   if (ctxPinVisLabel) {
@@ -3639,7 +3881,18 @@ if (ctxItemToggleMistake) {
     e.stopPropagation();
     if (activeHoveredWordData) {
       const verse = surahData.verses[activeHoveredWordData.verseIndex];
-      toggleWordMistake(currentSurahNumber, verse.verseNumber, activeHoveredWordData.wordIndex + 1);
+      markWordMistake(currentSurahNumber, verse.verseNumber, activeHoveredWordData.wordIndex + 1);
+      hideWordTooltip();
+    }
+  });
+}
+
+if (ctxItemClearMistake) {
+  ctxItemClearMistake.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (activeHoveredWordData) {
+      const verse = surahData.verses[activeHoveredWordData.verseIndex];
+      clearWordMistake(currentSurahNumber, verse.verseNumber, activeHoveredWordData.wordIndex + 1);
       hideWordTooltip();
     }
   });
@@ -5156,8 +5409,16 @@ function scheduleFsrsReview(card, rating, now = new Date()) {
   card.last_rating = rating;
   card.due = dueTime.toISOString();
 
+  // Auto-resolve active word mistakes in this Ayah when graded Good (3) or Easy (4)
+  if (rating === FSRS_RATING.GOOD || rating === FSRS_RATING.EASY) {
+    card._lastResolvedMistakes = resolveAyahMistakes(card.surahNumber, card.verseNumber);
+  } else {
+    card._lastResolvedMistakes = 0;
+  }
+
   saveFsrsCards();
   appendFsrsRevlog(card, rating, scheduledDays, now);
+  updateAyahGradedBadges();
   if (typeof scheduleGdriveAutoSync === 'function') {
     scheduleGdriveAutoSync();
   }
@@ -5246,18 +5507,20 @@ function renderGradingModal() {
 
   if (gradingAyahStatus) {
     gradingAyahStatus.className = 'compact-status-badge';
+    const lastGradedStr = card.last_review ? getLastGradedTimeStr(card.last_review, false) : '';
+    const gradedPart = lastGradedStr ? `Graded ${lastGradedStr} ago • ` : '';
     if (card.state === FSRS_STATE.NEW) {
       gradingAyahStatus.classList.add('state-new');
       gradingAyahStatus.textContent = 'New';
     } else if (card.state === FSRS_STATE.LEARNING) {
       gradingAyahStatus.classList.add('state-learning');
-      gradingAyahStatus.textContent = `Learning • Due ${getDueTimeStr(card.due)}`;
+      gradingAyahStatus.textContent = `Learning • ${gradedPart}Due ${getDueTimeStr(card.due)}`;
     } else if (card.state === FSRS_STATE.REVIEW) {
       gradingAyahStatus.classList.add('state-review');
-      gradingAyahStatus.textContent = `Review • S:${card.stability}d • Due ${getDueTimeStr(card.due)}`;
+      gradingAyahStatus.textContent = `Review • ${gradedPart}S:${card.stability}d • Due ${getDueTimeStr(card.due)}`;
     } else if (card.state === FSRS_STATE.RELEARNING) {
       gradingAyahStatus.classList.add('state-relearning');
-      gradingAyahStatus.textContent = `Lapsed • Due ${getDueTimeStr(card.due)}`;
+      gradingAyahStatus.textContent = `Lapsed • ${gradedPart}Due ${getDueTimeStr(card.due)}`;
     }
   }
 
@@ -5275,12 +5538,18 @@ function gradeCurrentAyah(rating) {
   updateFsrsBadgeAndNotifications();
   updateTopSurahDueBadge();
   renderSurahDropdown();
+  if (currentView === 'vbv') {
+    renderVbvView();
+  }
   if (isReviewMode) {
     applyMemorizeState(false);
   }
 
   const ratingNames = ['Again', 'Hard', 'Good', 'Easy'];
-  showToastNotification(`Ayah ${verse.verseNumber} graded: ${ratingNames[rating - 1]}`);
+  const resolvedSuffix = card._lastResolvedMistakes > 0
+    ? ` • ✓ ${card._lastResolvedMistakes} mistake${card._lastResolvedMistakes > 1 ? 's' : ''} resolved`
+    : '';
+  showToastNotification(`Ayah ${verse.verseNumber} graded: ${ratingNames[rating - 1]}${resolvedSuffix}`);
 
   if (isGradeModalFromReveal) {
     isGradeModalFromReveal = false;
@@ -5608,7 +5877,7 @@ function renderFsrsBrowser() {
             <td>${badgeHtml}</td>
             <td>${c.stability ? `${c.stability}d` : '—'}</td>
             <td>${c.difficulty ? `${c.difficulty}` : '—'}</td>
-            <td>${isNew ? 'Ready to study' : getDueTimeStr(c.due)}</td>
+            <td>${isNew ? 'Ready to study' : `${getDueTimeStr(c.due)}${c.last_review ? ` <span style="color:#64748b;font-size:0.75rem;">(graded ${getLastGradedTimeStr(c.last_review, false)} ago)</span>` : ''}`}</td>
             <td>${c.reps || 0}</td>
             <td>
               <div style="display:flex; gap:4px;">
@@ -5646,6 +5915,8 @@ window.resetWordCard = function(cardId) {
     fsrsCardStore[cardId].last_review = null;
     fsrsCardStore[cardId].last_rating = null;
     saveFsrsCards();
+    updateAyahGradedBadges();
+    if (currentView === 'vbv') renderVbvView();
     renderFsrsBrowser();
     updateTopSurahBadges();
     renderSurahDropdown();
@@ -5749,6 +6020,8 @@ function resetCurrentSurahFsrs() {
     }
   });
   saveFsrsCards();
+  updateAyahGradedBadges();
+  if (currentView === 'vbv') renderVbvView();
   updateTopSurahBadges();
   renderSurahDropdown();
   updateFsrsBadgeAndNotifications();
@@ -5774,6 +6047,8 @@ function resetAllFsrs() {
     fsrsCardStore[k].last_rating = null;
   });
   saveFsrsCards();
+  updateAyahGradedBadges();
+  if (currentView === 'vbv') renderVbvView();
   updateTopSurahBadges();
   renderSurahDropdown();
   updateFsrsBadgeAndNotifications();
@@ -5990,7 +6265,7 @@ function mergeAnkiRevlogs(remotePayload) {
   });
   saveFsrsCards();
 
-  // 3. Merge Mistakes
+  // 3. Merge Mistakes & Reconcile from Chronological History
   if (remotePayload.mistakes && typeof remotePayload.mistakes === 'object') {
     Object.assign(memorizeMistakes, remotePayload.mistakes);
     saveMistakes(memorizeMistakes);
@@ -6007,6 +6282,7 @@ function mergeAnkiRevlogs(remotePayload) {
       .slice(0, 500);
     saveMistakeHistory();
   }
+  reconcileMistakesFromHistory();
 
   // 4. Merge Notes (Last-write-wins based on updatedAt timestamp)
   if (remotePayload.notes && typeof remotePayload.notes === 'object') {
@@ -6053,6 +6329,8 @@ function mergeAnkiRevlogs(remotePayload) {
   updateWordElementsMistakeClasses();
   updateActiveMistakeButtonState();
   updateMemorizeOverridesStats();
+  updateAyahGradedBadges();
+  if (currentView === 'vbv') renderVbvView();
   updateFsrsBadgeAndNotifications(false);
   updateTopSurahDueBadge();
   renderSurahDropdown();
@@ -6218,6 +6496,7 @@ function importSyncData(inputData) {
         mistakeHistoryStore = data.mistakeHistory;
         saveMistakeHistory();
       }
+      reconcileMistakesFromHistory();
       if (data.notes && typeof data.notes === 'object') {
         Object.assign(ayahNotesStore, data.notes);
         saveAyahNotesStore();
@@ -6245,6 +6524,8 @@ function importSyncData(inputData) {
     updateWordElementsMistakeClasses();
     updateActiveMistakeButtonState();
     updateMemorizeOverridesStats();
+    updateAyahGradedBadges();
+    if (currentView === 'vbv') renderVbvView();
     updateFsrsBadgeAndNotifications(false);
     if (isMemorizeMode) {
       applyMemorizeState(true);

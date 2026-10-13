@@ -4815,4 +4815,100 @@ body.memorize-active .vbv-trans-hidden:hover {
   margin-top: 6px;
 }
 
+/* =========================================================
+   AYAH LAST GRADED TIME BADGE STYLES
+   ========================================================= */
+
+.ayah-graded-time-badge {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 6;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  direction: ltr;
+}
+
+.ayah-graded-time-badge.rating-1 {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.ayah-graded-time-badge.rating-2 {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+.ayah-graded-time-badge.rating-3 {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+.ayah-graded-time-badge.rating-4 {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.vbv-graded-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.vbv-graded-badge:hover {
+  transform: translateY(-1px);
+}
+.vbv-graded-badge.rating-1 {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.vbv-graded-badge.rating-2 {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+.vbv-graded-badge.rating-4 {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.btn-item-log-again {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  transition: all 0.15s;
+}
+.btn-item-log-again:hover {
+  background: #ffe4e6;
+}
+
+
 

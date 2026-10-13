@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v1.0.0/dist/font-face.css" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=2.9" />
+  <link rel="stylesheet" href="style.css?v=3.0" />
   <!-- Google Identity Services for Google Drive AppData Sync -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -368,10 +368,16 @@
         </div>
       </div>
       <hr class="ctx-divider" />
-      <div class="ctx-item" id="ctxItemToggleMistake" title="Toggle Mistake mark for this word">
+      <div class="ctx-item" id="ctxItemToggleMistake" title="Mark or log repeat mistake for this word">
         <div class="ctx-item-left">
           <span style="font-size:0.95rem;">🚩</span>
           <span id="ctxMistakeLabel">Mark as Mistake</span>
+        </div>
+      </div>
+      <div class="ctx-item" id="ctxItemClearMistake" title="Clear / resolve mistake mark for this word" style="display:none; color:#15803d;">
+        <div class="ctx-item-left">
+          <span style="font-size:0.95rem;">✓</span>
+          <span>Clear Mistake Flag</span>
         </div>
       </div>
       <div class="ctx-item" id="ctxItemPinVisible" title="Keep this word persistently visible in memorize mode">
@@ -779,13 +785,14 @@
       </div>
 
       <div class="repeat-tabs-track">
+        <button class="repeat-tab-btn active" data-tab="off" title="Repeat Off (Stop after single Ayah)">⏹</button>
         <button class="repeat-tab-btn" data-tab="single" title="Single Verse">🔂</button>
-        <button class="repeat-tab-btn active" data-tab="range" title="Range of Verses">🔁</button>
+        <button class="repeat-tab-btn" data-tab="range" title="Range of Verses">🔁</button>
         <button class="repeat-tab-btn" data-tab="full" title="Full Surah">♾️</button>
       </div>
 
       <div class="modal-body">
-        <div class="range-inputs-row" id="rangeInputsRow">
+        <div class="range-inputs-row" id="rangeInputsRow" style="display:none;">
           <div class="range-input-group">
             <label title="From Verse">⇥</label>
             <div class="search-input-box">
@@ -1357,6 +1364,6 @@
   <audio id="audioPlayer"></audio>
 
   <!-- External JavaScript Engine -->
-  <script src="app.js?v=2.9" defer></script>
+  <script src="app.js?v=3.0" defer></script>
 </body>
 </html>
