@@ -4910,5 +4910,97 @@ body.memorize-active .vbv-trans-hidden:hover {
   background: #ffe4e6;
 }
 
+/* =========================================================
+   TOP BAR ANKI-STYLE COLORED SYNC BUTTON & REMINDER BADGE
+   ========================================================= */
+
+.top-sync-btn {
+  position: relative;
+}
+
+.top-sync-icon {
+  transition: transform 0.3s ease;
+}
+
+@keyframes spin-anki-sync {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 1. Syncing in progress (Blue + Spinning Icon) */
+.header-sq-btn.top-sync-btn.sync-state-syncing {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+.header-sq-btn.top-sync-btn.sync-state-syncing .top-sync-icon {
+  animation: spin-anki-sync 1.1s linear infinite;
+}
+
+/* 2. All Synced / Up to Date (Emerald Green) */
+.header-sq-btn.top-sync-btn.sync-state-synced {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #059669;
+}
+.header-sq-btn.top-sync-btn.sync-state-synced:hover {
+  background: #d1fae5;
+}
+
+/* 3. Unsynced Local Changes / Stale Sync Reminder (Anki Amber/Orange Highlight) */
+.header-sq-btn.top-sync-btn.sync-state-pending {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #d97706;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+.header-sq-btn.top-sync-btn.sync-state-pending:hover {
+  background: #fef3c7;
+}
+
+/* 4. Session Expired / Attention Needed / Sync Error (Anki Red/Coral Highlight) */
+.header-sq-btn.top-sync-btn.sync-state-expired {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.22);
+}
+.header-sq-btn.top-sync-btn.sync-state-expired:hover {
+  background: #fee2e2;
+}
+
+.top-sync-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: #f59e0b;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+
+.top-sync-btn.sync-state-synced .top-sync-badge {
+  background: #10b981;
+}
+
+.top-sync-btn.sync-state-pending .top-sync-badge {
+  background: #f59e0b;
+}
+
+.top-sync-btn.sync-state-expired .top-sync-badge {
+  background: #ef4444;
+}
+
 
 

@@ -463,6 +463,7 @@ function loadWordVisOverrides() {
 function saveWordVisOverrides(data) {
   try {
     localStorage.setItem(WORD_VIS_OVERRIDES_KEY, JSON.stringify(data));
+    if (typeof markSyncPending === 'function') markSyncPending(1);
   } catch (e) {}
 }
 let wordVisOverrides = loadWordVisOverrides();
@@ -478,6 +479,7 @@ function loadAyahVisOverrides() {
 function saveAyahVisOverrides(data) {
   try {
     localStorage.setItem(AYAH_VIS_OVERRIDES_KEY, JSON.stringify(data));
+    if (typeof markSyncPending === 'function') markSyncPending(1);
   } catch (e) {}
 }
 let ayahVisOverrides = loadAyahVisOverrides();
@@ -752,6 +754,7 @@ function saveCurrentAyahNote() {
     ayahNotesStore[key] = text;
   }
   saveAyahNotesStore();
+  if (typeof markSyncPending === 'function') markSyncPending(1);
   closeAyahNoteModal();
   refreshAyahNotesUi(surahNum, verseNum);
   showToastNotification(text ? `📝 Note saved for ${surahNum}:${verseNum}` : `🗑️ Note cleared for ${surahNum}:${verseNum}`);
@@ -763,6 +766,7 @@ function deleteCurrentAyahNote() {
   const key = `${surahNum}:${verseNum}`;
   delete ayahNotesStore[key];
   saveAyahNotesStore();
+  if (typeof markSyncPending === 'function') markSyncPending(1);
   closeAyahNoteModal();
   refreshAyahNotesUi(surahNum, verseNum);
   showToastNotification(`🗑️ Note deleted for ${surahNum}:${verseNum}`);
@@ -998,6 +1002,7 @@ function recordMistakeHistoryEntry(surahNum, verseNum, wordPos, action = 'marked
 
   if (autoSave) {
     saveMistakeHistory();
+    if (typeof markSyncPending === 'function') markSyncPending(1);
     const modal = document.getElementById('mistakeHistoryModal');
     if (modal && (modal.classList.contains('show') || modal.style.display === 'flex')) {
       renderMistakeHistoryModal();
@@ -5244,6 +5249,7 @@ function appendFsrsRevlog(card, rating, scheduledDays, now = new Date()) {
   };
   fsrsRevlogStore.push(entry);
   saveFsrsRevlog();
+  if (typeof markSyncPending === 'function') markSyncPending(1);
   return entry;
 }
 
@@ -6374,6 +6380,7 @@ function exportSyncData() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    if (typeof clearUnsyncedChanges === 'function') clearUnsyncedChanges();
     showSyncStatus('✓ Exported progress file successfully! Transfer to Android and click Import.', 'success');
   } catch (err) {
     console.error('Export error:', err);
@@ -6530,6 +6537,7 @@ function importSyncData(inputData) {
     if (isMemorizeMode) {
       applyMemorizeState(true);
     }
+    if (typeof clearUnsyncedChanges === 'function') clearUnsyncedChanges();
 
     showSyncStatus(`✓ Imported successfully! (${cardCount} cards, ${mistakeCount} mistakes)`, 'success');
     showToastNotification(`✓ Progress synced: ${cardCount} cards updated`);
@@ -6548,6 +6556,7 @@ function copySyncToClipboard() {
     const jsonStr = JSON.stringify(payload);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(jsonStr).then(() => {
+        if (typeof clearUnsyncedChanges === 'function') clearUnsyncedChanges();
         showSyncStatus('✓ Sync code copied to clipboard! Paste it on your other device.', 'success');
         showToastNotification('✓ Sync code copied to clipboard');
       }).catch(() => {
@@ -6571,6 +6580,7 @@ function fallbackCopyText(text) {
   ta.select();
   try {
     document.execCommand('copy');
+    if (typeof clearUnsyncedChanges === 'function') clearUnsyncedChanges();
     showSyncStatus('✓ Sync code copied to clipboard! Paste it on your other device.', 'success');
     showToastNotification('✓ Sync code copied to clipboard');
   } catch (e) {
@@ -6631,11 +6641,14 @@ const GDRIVE_CLIENT_ID_KEY = 'quran_gdrive_client_id';
 const GDRIVE_ACCESS_TOKEN_KEY = 'quran_gdrive_access_token';
 const GDRIVE_TOKEN_EXP_KEY = 'quran_gdrive_token_exp';
 const GDRIVE_LAST_SYNC_KEY = 'quran_gdrive_last_sync';
+const GDRIVE_AUTHORIZED_KEY = 'quran_gdrive_authorized';
+const GDRIVE_UNSYNCED_COUNT_KEY = 'quran_gdrive_unsynced_count';
 const GDRIVE_FILE_NAME = 'quran_mem_sync_revlog.json';
 
 let gdriveTokenClient = null;
 let isGdriveSyncing = false;
 let gdriveAutoSyncTimer = null;
+let gdriveTokenRefreshTimer = null;
 
 function getGdriveClientId() {
   return localStorage.getItem(GDRIVE_CLIENT_ID_KEY) || '';
@@ -6647,6 +6660,27 @@ function setGdriveClientId(id) {
   } else {
     localStorage.removeItem(GDRIVE_CLIENT_ID_KEY);
   }
+  updateTopSyncButtonUi();
+}
+
+function hasGdrivePreviousAuth() {
+  return localStorage.getItem(GDRIVE_AUTHORIZED_KEY) === 'true';
+}
+
+function getUnsyncedChangesCount() {
+  return parseInt(localStorage.getItem(GDRIVE_UNSYNCED_COUNT_KEY) || '0') || 0;
+}
+
+function markSyncPending(increment = 1) {
+  const nextCount = getUnsyncedChangesCount() + increment;
+  localStorage.setItem(GDRIVE_UNSYNCED_COUNT_KEY, nextCount.toString());
+  updateTopSyncButtonUi(isGdriveSyncing, false);
+  scheduleGdriveAutoSync();
+}
+
+function clearUnsyncedChanges() {
+  localStorage.setItem(GDRIVE_UNSYNCED_COUNT_KEY, '0');
+  updateTopSyncButtonUi(false, false);
 }
 
 function getGdriveAccessToken() {
@@ -6659,18 +6693,39 @@ function getGdriveAccessToken() {
   return token;
 }
 
+function scheduleGdriveTokenRefresh() {
+  if (gdriveTokenRefreshTimer) clearTimeout(gdriveTokenRefreshTimer);
+  const exp = parseInt(localStorage.getItem(GDRIVE_TOKEN_EXP_KEY) || '0');
+  if (!exp) return;
+  // Refresh 5 minutes before token expires while app is open
+  const msUntilRefresh = Math.max(10000, exp - Date.now() - 5 * 60 * 1000);
+  gdriveTokenRefreshTimer = setTimeout(() => {
+    if (document.visibilityState === 'visible' && hasGdrivePreviousAuth()) {
+      requestGdriveAuth(false, true);
+    } else {
+      updateTopSyncButtonUi();
+    }
+  }, msUntilRefresh);
+}
+
 function saveGdriveToken(token, expiresInSec = 3600) {
   localStorage.setItem(GDRIVE_ACCESS_TOKEN_KEY, token);
   localStorage.setItem(GDRIVE_TOKEN_EXP_KEY, (Date.now() + expiresInSec * 1000).toString());
+  localStorage.setItem(GDRIVE_AUTHORIZED_KEY, 'true');
+  scheduleGdriveTokenRefresh();
 }
 
-function clearGdriveToken() {
+function clearGdriveToken(fullDisconnect = false) {
   localStorage.removeItem(GDRIVE_ACCESS_TOKEN_KEY);
   localStorage.removeItem(GDRIVE_TOKEN_EXP_KEY);
+  if (gdriveTokenRefreshTimer) clearTimeout(gdriveTokenRefreshTimer);
+  if (fullDisconnect) {
+    localStorage.removeItem(GDRIVE_AUTHORIZED_KEY);
+  }
 }
 
 function isGdriveConnected() {
-  return !!getGdriveAccessToken();
+  return !!getGdriveAccessToken() || hasGdrivePreviousAuth();
 }
 
 function formatGdriveRelativeTime(isoString) {
@@ -6686,6 +6741,69 @@ function formatGdriveRelativeTime(isoString) {
   return `${diffDays}d ago`;
 }
 
+function updateTopSyncButtonUi(syncing = false, hasError = false) {
+  const topSyncBtn = document.getElementById('topSyncBtn');
+  const topSyncBadge = document.getElementById('topSyncBadge');
+  if (!topSyncBtn || !topSyncBadge) return;
+
+  topSyncBtn.classList.remove(
+    'sync-state-syncing',
+    'sync-state-synced',
+    'sync-state-pending',
+    'sync-state-expired'
+  );
+
+  if (syncing) {
+    topSyncBtn.classList.add('sync-state-syncing');
+    topSyncBadge.style.display = 'none';
+    topSyncBtn.title = '🔄 Syncing with Google Drive...';
+    return;
+  }
+
+  const unsyncedCount = getUnsyncedChangesCount();
+  const hasValidToken = !!getGdriveAccessToken();
+  const isLinked = hasGdrivePreviousAuth() || !!getGdriveClientId();
+  const lastSyncIso = localStorage.getItem(GDRIVE_LAST_SYNC_KEY);
+  const hoursSinceLastSync = lastSyncIso
+    ? (Date.now() - new Date(lastSyncIso).getTime()) / 3600000
+    : Infinity;
+
+  // 1. Error or session expired while changes are waiting
+  if (hasError || (isLinked && !hasValidToken && unsyncedCount > 0)) {
+    topSyncBtn.classList.add('sync-state-expired');
+    topSyncBadge.style.display = 'inline-flex';
+    topSyncBadge.textContent = unsyncedCount > 0 ? (unsyncedCount > 99 ? '99+' : `${unsyncedCount}`) : '!';
+    topSyncBtn.title = unsyncedCount > 0
+      ? `🔴 ${unsyncedCount} unsynced change${unsyncedCount === 1 ? '' : 's'} (Session expired) • Click to sync now`
+      : '🔴 Sync attention needed • Click to reconnect & sync';
+    return;
+  }
+
+  // 2. Unsynced local changes OR stale sync (>12h) -> Anki Amber/Orange Highlight
+  if (unsyncedCount > 0 || (isLinked && hoursSinceLastSync >= 12)) {
+    topSyncBtn.classList.add('sync-state-pending');
+    topSyncBadge.style.display = 'inline-flex';
+    topSyncBadge.textContent = unsyncedCount > 0 ? (unsyncedCount > 99 ? '99+' : `${unsyncedCount}`) : '●';
+    topSyncBtn.title = unsyncedCount > 0
+      ? `🟠 ${unsyncedCount} unsynced change${unsyncedCount === 1 ? '' : 's'} • Click to sync now`
+      : `🟠 Last synced ${formatGdriveRelativeTime(lastSyncIso)} • Click to sync`;
+    return;
+  }
+
+  // 3. Connected or synced cleanly -> Anki Green Highlight
+  if (hasValidToken || (isLinked && lastSyncIso)) {
+    topSyncBtn.classList.add('sync-state-synced');
+    topSyncBadge.style.display = 'inline-flex';
+    topSyncBadge.textContent = '✓';
+    topSyncBtn.title = `✓ Synced with Google Drive • Last synced: ${formatGdriveRelativeTime(lastSyncIso)} (Click to sync)`;
+    return;
+  }
+
+  // 4. Default unconfigured state
+  topSyncBadge.style.display = 'none';
+  topSyncBtn.title = 'Cloud Sync (Click to configure Google Drive or Backup)';
+}
+
 function updateGdriveUi(isConnected, syncing = false, message = null) {
   const statusDot = document.getElementById('gdriveStatusDot');
   const statusText = document.getElementById('gdriveStatusText');
@@ -6699,6 +6817,8 @@ function updateGdriveUi(isConnected, syncing = false, message = null) {
     inputClientId.value = getGdriveClientId();
   }
 
+  updateTopSyncButtonUi(syncing, false);
+
   if (syncing) {
     if (statusDot) statusDot.className = 'gdrive-status-dot syncing';
     if (statusText) statusText.textContent = message || 'Syncing with Google Drive...';
@@ -6707,12 +6827,18 @@ function updateGdriveUi(isConnected, syncing = false, message = null) {
 
   const lastSyncIso = localStorage.getItem(GDRIVE_LAST_SYNC_KEY);
   const logCount = fsrsRevlogStore ? fsrsRevlogStore.length : 0;
+  const hasValidToken = !!getGdriveAccessToken();
+  const unsyncedCount = getUnsyncedChangesCount();
 
   if (isConnected) {
     if (statusDot) statusDot.className = 'gdrive-status-dot connected';
-    if (statusText) statusText.textContent = 'Connected to Google Drive';
+    if (statusText) {
+      statusText.textContent = hasValidToken
+        ? (unsyncedCount > 0 ? `Connected (${unsyncedCount} unsynced)` : 'Connected to Google Drive')
+        : 'Google Drive Linked (Tap Sync to refresh)';
+    }
     if (authBtn) authBtn.classList.add('connected');
-    if (authLabel) authLabel.textContent = 'Connected ✓';
+    if (authLabel) authLabel.textContent = hasValidToken ? 'Connected ✓' : 'Sync Drive';
     if (syncActions) syncActions.style.display = 'block';
     if (syncMeta) {
       syncMeta.textContent = `Last synced: ${formatGdriveRelativeTime(lastSyncIso)} • ${logCount} review(s) in Anki log`;
@@ -6734,6 +6860,7 @@ function initGdriveSync() {
   const authBtn = document.getElementById('btnGdriveAuth');
   const btnSyncNow = document.getElementById('btnGdriveSyncNow');
   const btnDisconnect = document.getElementById('btnGdriveDisconnect');
+  const topSyncBtn = document.getElementById('topSyncBtn');
 
   if (inputClientId) inputClientId.value = getGdriveClientId();
 
@@ -6754,10 +6881,10 @@ function initGdriveSync() {
 
   if (authBtn) {
     authBtn.addEventListener('click', () => {
-      if (isGdriveConnected()) {
+      if (getGdriveAccessToken()) {
         syncWithGoogleDrive(false);
       } else {
-        requestGdriveAuth();
+        requestGdriveAuth(false, false);
       }
     });
   }
@@ -6770,14 +6897,36 @@ function initGdriveSync() {
     btnDisconnect.addEventListener('click', disconnectGdrive);
   }
 
+  if (topSyncBtn) {
+    topSyncBtn.addEventListener('click', () => {
+      if (getGdriveClientId()) {
+        syncWithGoogleDrive(false);
+      } else {
+        if (typeof openSettings === 'function') openSettings();
+        const gdriveCard = document.getElementById('gdriveSyncCard');
+        const details = document.getElementById('gdriveConfigDetails');
+        if (details) details.open = true;
+        if (gdriveCard) {
+          setTimeout(() => gdriveCard.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+        }
+        showToastNotification('☁️ Configure Google Drive Client ID or use Backup/Sync below');
+      }
+    });
+  }
+
+  if (getGdriveAccessToken()) {
+    localStorage.setItem(GDRIVE_AUTHORIZED_KEY, 'true');
+    scheduleGdriveTokenRefresh();
+  }
+
   updateGdriveUi(isGdriveConnected());
 
-  if (isGdriveConnected()) {
+  if (getGdriveAccessToken()) {
     setTimeout(() => syncWithGoogleDrive(true), 3000);
   }
 }
 
-function requestGdriveAuth() {
+function requestGdriveAuth(forceConsent = false, isBackgroundRefresh = false) {
   const clientId = getGdriveClientId();
   if (!clientId) {
     const details = document.getElementById('gdriveConfigDetails');
@@ -6792,9 +6941,13 @@ function requestGdriveAuth() {
   }
 
   if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-    showToastNotification('Google Identity Service is loading, please try again in a moment...');
+    if (!isBackgroundRefresh) {
+      showToastNotification('Google Identity Service is loading, please try again in a moment...');
+    }
     return;
   }
+
+  const useSilentPrompt = !forceConsent && hasGdrivePreviousAuth();
 
   try {
     gdriveTokenClient = google.accounts.oauth2.initTokenClient({
@@ -6802,24 +6955,37 @@ function requestGdriveAuth() {
       scope: 'https://www.googleapis.com/auth/drive.appdata',
       callback: (resp) => {
         if (resp.error) {
-          console.error('Google Auth Error:', resp);
-          showToastNotification(`Google Auth Error: ${resp.error}`);
-          updateGdriveUi(false, false, 'Auth failed');
+          console.warn('Google Auth Response:', resp);
+          // If silent prompt failed because consent or account selection is needed, retry with select_account
+          if (useSilentPrompt && !isBackgroundRefresh && (resp.error === 'interaction_required' || resp.error === 'consent_required' || resp.error === 'login_required')) {
+            requestGdriveAuth(true, false);
+            return;
+          }
+          if (!isBackgroundRefresh) {
+            showToastNotification(`Google Auth Error: ${resp.error}`);
+            updateGdriveUi(isGdriveConnected(), false, 'Auth cancelled');
+            updateTopSyncButtonUi(false, true);
+          }
           return;
         }
         if (resp.access_token) {
           saveGdriveToken(resp.access_token, resp.expires_in || 3600);
           updateGdriveUi(true);
-          showToastNotification('✓ Connected to Google Drive!');
-          syncWithGoogleDrive(false);
+          if (!isBackgroundRefresh) {
+            showToastNotification('✓ Connected to Google Drive!');
+          }
+          syncWithGoogleDrive(isBackgroundRefresh);
         }
       }
     });
 
-    gdriveTokenClient.requestAccessToken({ prompt: 'consent' });
+    // Use empty prompt ('') when already authorized so Google skips the consent screen!
+    gdriveTokenClient.requestAccessToken({ prompt: useSilentPrompt ? '' : 'select_account' });
   } catch (err) {
     console.error('Error starting Google Auth:', err);
-    showToastNotification('Failed to open Google Sign-In prompt. Check Client ID.');
+    if (!isBackgroundRefresh) {
+      showToastNotification('Failed to open Google Sign-In prompt. Check Client ID.');
+    }
   }
 }
 
@@ -6830,7 +6996,7 @@ function disconnectGdrive() {
       google.accounts.oauth2.revoke(token, () => {});
     } catch (e) {}
   }
-  clearGdriveToken();
+  clearGdriveToken(true);
   updateGdriveUi(false);
   showToastNotification('Disconnected from Google Drive');
   showSyncStatus('Disconnected from Google Drive', 'info');
@@ -6840,8 +7006,9 @@ async function syncWithGoogleDrive(isSilent = false) {
   if (isGdriveSyncing) return;
   const token = getGdriveAccessToken();
   if (!token) {
+    updateTopSyncButtonUi(false, false);
     if (!isSilent) {
-      requestGdriveAuth();
+      requestGdriveAuth(false, false);
     }
     return;
   }
@@ -6857,10 +7024,13 @@ async function syncWithGoogleDrive(isSilent = false) {
     });
 
     if (searchRes.status === 401) {
-      clearGdriveToken();
-      updateGdriveUi(false, false, 'Session expired. Reconnect.');
-      if (!isSilent) showToastNotification('Google session expired. Please reconnect.');
+      clearGdriveToken(false);
+      updateGdriveUi(isGdriveConnected(), false, 'Session expired. Tap Sync to refresh.');
+      updateTopSyncButtonUi(false, true);
       isGdriveSyncing = false;
+      if (!isSilent) {
+        requestGdriveAuth(false, false);
+      }
       return;
     }
 
@@ -6927,6 +7097,7 @@ async function syncWithGoogleDrive(isSilent = false) {
 
     const nowIso = new Date().toISOString();
     localStorage.setItem(GDRIVE_LAST_SYNC_KEY, nowIso);
+    clearUnsyncedChanges();
     updateGdriveUi(true, false);
 
     const logCount = fsrsRevlogStore.length;
@@ -6937,6 +7108,7 @@ async function syncWithGoogleDrive(isSilent = false) {
   } catch (err) {
     console.error('Google Drive sync error:', err);
     updateGdriveUi(true, false);
+    updateTopSyncButtonUi(false, true);
     showSyncStatus('✕ Google Drive sync error', 'error');
     if (!isSilent) showToastNotification('✕ Google Drive sync failed. Check connection.');
   } finally {
@@ -6945,7 +7117,10 @@ async function syncWithGoogleDrive(isSilent = false) {
 }
 
 function scheduleGdriveAutoSync() {
-  if (!isGdriveConnected()) return;
+  if (!getGdriveAccessToken()) {
+    updateTopSyncButtonUi(false, false);
+    return;
+  }
   if (gdriveAutoSyncTimer) clearTimeout(gdriveAutoSyncTimer);
   gdriveAutoSyncTimer = setTimeout(() => {
     syncWithGoogleDrive(true);
