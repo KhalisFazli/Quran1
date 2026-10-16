@@ -5025,18 +5025,134 @@ window.selectSurah = function(id) {
 };
 
 // =========================================================
-// CUSTOM TEXTS & MIXED LANGUAGE SYSTEM
+// CUSTOM TEXTS, OBSIDIAN MARKDOWN & MIXED LANGUAGE SYSTEM
 // =========================================================
 
+function parseObsidianFrontmatter(rawText) {
+  if (!rawText) return { text: '', title: '', category: '', tags: [] };
+  let title = '';
+  let category = '';
+  let tags = [];
+  let body = rawText;
+
+  const fmMatch = rawText.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (fmMatch) {
+    const yaml = fmMatch[1];
+    body = rawText.slice(fmMatch[0].length);
+
+    const titleMatch = yaml.match(/^title:\s*(.*)$/im);
+    if (titleMatch) title = titleMatch[1].trim().replace(/^['"]|['"]$/g, '');
+
+    const catMatch = yaml.match(/^category:\s*(.*)$/im);
+    if (catMatch) category = catMatch[1].trim().replace(/^['"]|['"]$/g, '');
+
+    const tagsMatch = yaml.match(/^tags:\s*(?:\[(.*?)\]|(.*))$/im);
+    if (tagsMatch) {
+      const rawTags = tagsMatch[1] || tagsMatch[2] || '';
+      tags = rawTags.split(/[, ]+/).map(t => t.trim().replace(/^#/, '')).filter(Boolean);
+      if (!category && tags.length > 0) {
+        category = tags[0];
+      }
+    }
+  }
+
+  return { text: body, title, category, tags };
+}
+
+function cleanMarkdownLine(line) {
+  if (!line) return '';
+  let l = line.trim();
+
+  // Strip horizontal rules (---, ***, ___)
+  if (/^(\*{3,}|-{3,}|_{3,})$/.test(l)) return '';
+
+  // Strip markdown headings (# Title, ## Subtitle)
+  l = l.replace(/^#{1,6}\s+/, '');
+
+  // Strip Obsidian callouts (> [!note], > [!info], etc.)
+  l = l.replace(/^>\s*\[![\w-]+\]\s*/i, '');
+
+  // Strip blockquote markers (> )
+  l = l.replace(/^>\s*/, '');
+
+  // Strip task list checkboxes (- [ ] , - [x] )
+  l = l.replace(/^[-*+]\s+\[[ xX]\]\s+/, '');
+
+  // Strip bullet list markers (- , * , + )
+  l = l.replace(/^[-*+]\s+/, '');
+
+  // Strip numbered list markers (1. , 2) , etc.) so "1." doesn't cause a false sentence split
+  l = l.replace(/^\d+[\.\)]\s+/, '');
+
+  // Obsidian wiki-links: [[Page Title|Display Text]] -> Display Text, [[Page Title]] -> Page Title
+  l = l.replace(/\[\[([^|\]\n]+)\|([^\]\n]+)\]\]/g, '$2');
+  l = l.replace(/\[\[([^\]\n]+)\]\]/g, '$1');
+
+  // Strip image embeds: ![[image.png]] or ![alt](url)
+  l = l.replace(/!\[\[[^\]\n]+\]\]/g, '');
+  l = l.replace(/!\[[^\]\n]*\]\([^)\n]*\)/g, '');
+
+  // Standard markdown links: [Display Text](url) -> Display Text
+  l = l.replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, '$1');
+
+  // Obsidian highlights: ==text== -> text
+  l = l.replace(/==([^=\n]+)==/g, '$1');
+
+  // Bold / italics: ***text***, **text**, *text*, ___text___, __text__, _text_
+  l = l.replace(/\*\*\*([^*]+)\*\*\*/g, '$1');
+  l = l.replace(/\*\*([^*]+)\*\*/g, '$1');
+  l = l.replace(/\*([^*]+)\*/g, '$1');
+  l = l.replace(/___([^_]+)___/g, '$1');
+  l = l.replace(/__([^_]+)__/g, '$1');
+
+  // Strikethrough: ~~text~~ -> text
+  l = l.replace(/~~([^~]+)~~/g, '$1');
+
+  // Inline code: `code` -> code
+  l = l.replace(/`([^`]+)`/g, '$1');
+
+  // Clean HTML tags (<br>, <span>, etc.)
+  l = l.replace(/<br\s*\/?>/gi, ' ');
+  l = l.replace(/<[^>]+>/g, '');
+
+  return l.trim();
+}
+
+function extractCustomSegments(rawText) {
+  if (!rawText) return [];
+
+  // 1. Separate YAML frontmatter if present (Obsidian notes)
+  const { text: bodyText } = parseObsidianFrontmatter(rawText);
+
+  // 2. Normalize line breaks
+  const normalized = bodyText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  // 3. Process line by line: each non-empty line is an ayah, and dots (.) within a line also divide ayahs
+  const lines = normalized.split('\n');
+  const segments = [];
+
+  lines.forEach(rawLine => {
+    const cleanedLine = cleanMarkdownLine(rawLine);
+    if (!cleanedLine) return;
+
+    // Within each non-empty line, check if there are sub-sentences divided by dots (., ۔)
+    const subParts = cleanedLine.split(/[.۔]+/).map(s => s.trim()).filter(s => s.length > 0);
+    if (subParts.length > 0) {
+      subParts.forEach(part => segments.push(part));
+    }
+  });
+
+  return segments;
+}
+
 function countCustomSentences(rawText) {
-  if (!rawText) return 0;
-  const segments = rawText.split(/[.۔]+/).map(s => s.trim()).filter(s => s.length > 0);
-  return segments.length;
+  return extractCustomSegments(rawText).length;
 }
 
 function parseCustomTextToSurahData(customText) {
   const text = customText.rawText || '';
-  const rawSegments = text.split(/[.۔]+/).map(s => s.trim()).filter(s => s.length > 0);
+  const { title: fmTitle, category: fmCategory } = parseObsidianFrontmatter(text);
+  const rawSegments = extractCustomSegments(text);
 
   let globalWordCounter = 0;
   const verses = rawSegments.map((sentence, idx) => {
@@ -5073,14 +5189,17 @@ function parseCustomTextToSurahData(customText) {
     };
   });
 
+  const finalTitle = customText.title || fmTitle || 'Custom Text';
+  const finalCategory = customText.category || fmCategory || 'Custom Text';
+
   return {
     isCustom: true,
     customId: customText.id,
     meta: {
       number: customText.id,
-      name: customText.title,
-      englishName: customText.title,
-      englishNameTranslation: customText.category || 'Custom Text',
+      name: finalTitle,
+      englishName: finalTitle,
+      englishNameTranslation: finalCategory,
       numberOfAyahs: verses.length
     },
     verses: verses
@@ -5134,6 +5253,46 @@ And whoever emigrated for worldly benefit or to marry a woman, his emigration is
   }
 }
 
+function triggerCustomFileImport() {
+  const fileInput = document.getElementById('customFileInput');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.click();
+  }
+}
+
+function handleCustomFileImport(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const rawContent = e.target.result || '';
+    const { text: cleanBody, title: fmTitle, category: fmCategory } = parseObsidianFrontmatter(rawContent);
+
+    if (!customTextModal || customTextModal.style.display === 'none') {
+      openCustomTextModal();
+    }
+
+    const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+    if (customTextTitleInput) {
+      if (!customTextTitleInput.value || customTextTitleInput.value === 'New Custom Text' || customTextTitleInput.value === 'Custom Text') {
+        customTextTitleInput.value = fmTitle || fileNameWithoutExt;
+      }
+    }
+    if (customTextCategoryInput && !customTextCategoryInput.value && fmCategory) {
+      customTextCategoryInput.value = fmCategory;
+    }
+    if (customTextContentInput) {
+      customTextContentInput.value = cleanBody || rawContent;
+      updateCustomTextStatsBar();
+    }
+    showToastNotification(`Imported "${file.name}"`);
+  };
+  reader.readAsText(file);
+}
+
+window.triggerCustomFileImport = triggerCustomFileImport;
+window.handleCustomFileImport = handleCustomFileImport;
+
 function initCustomTexts() {
   loadCustomTextsStore();
   seedSampleCustomTextsIfEmpty();
@@ -5142,7 +5301,33 @@ function initCustomTexts() {
   }
   if (customTextContentInput) {
     customTextContentInput.addEventListener('input', updateCustomTextStatsBar);
+
+    // Drag-and-drop Obsidian .md and .txt files
+    customTextContentInput.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      customTextContentInput.classList.add('drag-over');
+    });
+    customTextContentInput.addEventListener('dragleave', () => {
+      customTextContentInput.classList.remove('drag-over');
+    });
+    customTextContentInput.addEventListener('drop', (e) => {
+      e.preventDefault();
+      customTextContentInput.classList.remove('drag-over');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleCustomFileImport(e.dataTransfer.files[0]);
+      }
+    });
   }
+
+  const customFileInput = document.getElementById('customFileInput');
+  if (customFileInput) {
+    customFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleCustomFileImport(e.target.files[0]);
+      }
+    });
+  }
+
   if (customTextModal) {
     customTextModal.addEventListener('click', (e) => {
       if (e.target === customTextModal) closeCustomTextModal();

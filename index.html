@@ -135,6 +135,9 @@
           <span class="lib-tab-count" id="customTextsCountBadge">0</span>
         </button>
         <div style="flex:1;"></div>
+        <button type="button" class="lib-btn-new-custom" id="btnImportCustomMd" onclick="triggerCustomFileImport()" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1; margin-right:8px;" title="Import Obsidian Markdown (.md) or text file">
+          <span>📂 Import .md</span>
+        </button>
         <button type="button" class="lib-btn-new-custom" id="btnNewCustomText" onclick="openCustomTextModal()">
           <span>➕ New Text</span>
         </button>
@@ -660,7 +663,7 @@
           <span class="custom-text-icon">📝</span>
           <div>
             <h3 id="customModalHeading">New Custom Text</h3>
-            <span class="custom-text-sub">Sentence ending with a dot (.) becomes an Ayah. Supports mixed Arabic & English.</span>
+            <span class="custom-text-sub">Dot (.) or line end divides Ayahs. Supports Obsidian Markdown (.md) & mixed Arabic/English.</span>
           </div>
         </div>
         <button type="button" class="custom-text-close" id="btnCloseCustomTextModal" onclick="closeCustomTextModal()" title="Close">✕</button>
@@ -668,6 +671,7 @@
 
       <div class="custom-text-modal-body">
         <input type="hidden" id="customTextEditId" value="" />
+        <input type="file" id="customFileInput" accept=".md,.markdown,.txt" style="display:none;" />
 
         <div class="custom-form-row">
           <div class="custom-form-group flex-2">
@@ -691,12 +695,17 @@
 
         <div class="custom-form-group">
           <div class="custom-textarea-header">
-            <label for="customTextContentInput">Text Content (Dot '.' divides sentences / ayahs)</label>
-            <button type="button" class="btn-insert-sample" id="btnInsertSampleText" onclick="insertSampleCustomText()">
-              ✨ Insert Sample Text
-            </button>
+            <label for="customTextContentInput">Text Content (Dot '.' or line end divides Ayahs)</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn-insert-sample" id="btnImportCustomFileModal" onclick="triggerCustomFileImport()" style="background:#e0f2fe; border-color:#bae6fd; color:#0369a1;" title="Import an Obsidian Markdown (.md) or text file">
+                📂 Import .md / .txt
+              </button>
+              <button type="button" class="btn-insert-sample" id="btnInsertSampleText" onclick="insertSampleCustomText()">
+                ✨ Insert Sample Text
+              </button>
+            </div>
           </div>
-          <textarea id="customTextContentInput" rows="9" placeholder="Enter or paste text here. Every sentence ending with a dot (.) will be treated as an Ayah with a dot button. Mixed Arabic and English words are fully supported!&#10;&#10;Example:&#10;إنما الأعمال بالنيات. Actions are but by intention. وإنما لكل امرئ ما نوى. And each person will have only what they intended."></textarea>
+          <textarea id="customTextContentInput" rows="9" placeholder="Enter, paste, or drag & drop text or Obsidian markdown (.md) here. Every sentence ending with a dot (.) or line end becomes an Ayah. Full Obsidian support (frontmatter, [[links]], lists, and mixed Arabic/English)!&#10;&#10;Example:&#10;إنما الأعمال بالنيات. Actions are but by intention.&#10;وإنما لكل امرئ ما نوى. And each person will have only what they intended."></textarea>
           <div class="custom-text-stats-bar" id="customTextStatsBar">
             <span id="customTextSentenceCount">0 sentences (ayahs)</span>
             <span>•</span>

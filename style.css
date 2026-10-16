@@ -5750,5 +5750,22 @@ body.memorize-active .vbv-trans-hidden:hover {
   top: 100% !important;
 }
 
+/* Drag & Drop styling for custom text editor */
+#customTextContentInput.drag-over {
+  border-color: #d97706 !important;
+  background-color: #fffbeb !important;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.25) !important;
+}
+
+.lib-btn-new-custom.btn-import-custom {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+.lib-btn-new-custom.btn-import-custom:hover {
+  background: #bae6fd;
+  color: #0284c7;
+}
+
 
 
