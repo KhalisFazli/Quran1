@@ -5081,9 +5081,6 @@ function cleanMarkdownLine(line) {
   // Strip bullet list markers (- , * , + )
   l = l.replace(/^[-*+]\s+/, '');
 
-  // Strip numbered list markers (1. , 2) , etc.) so "1." doesn't cause a false sentence split
-  l = l.replace(/^\d+[\.\)]\s+/, '');
-
   // Obsidian wiki-links: [[Page Title|Display Text]] -> Display Text, [[Page Title]] -> Page Title
   l = l.replace(/\[\[([^|\]\n]+)\|([^\]\n]+)\]\]/g, '$2');
   l = l.replace(/\[\[([^\]\n]+)\]\]/g, '$1');
@@ -5118,6 +5115,44 @@ function cleanMarkdownLine(line) {
   return l.trim();
 }
 
+function splitLineIntoSentences(line) {
+  if (!line || !line.trim()) return [];
+
+  // 1. Strip leading dot if it was an artifact at the start of an Arabic RTL line (e.g. ".وَأَمَّا")
+  let processed = line.trim().replace(/^[.۔]\s*/, '');
+
+  // 2. Protect numbers with dots from splitting:
+  // Examples: "1.", "2.", "1.5", "3.14", ".1", "١.", "۲.", "10.2"
+  // Western digits: 0-9; Arabic-Indic digits: \u0660-\u0669 and \u06F0-\u06F9
+  processed = processed.replace(/([\d\u0660-\u0669\u06F0-\u06F9]+)[.۔]([\d\u0660-\u0669\u06F0-\u06F9]*)/g, (m, d1, d2) => {
+    return d1 + '__NUM_DOT__' + d2;
+  });
+
+  // Also protect leading dots attached to digits (e.g. ".1" or ".١" in RTL layout)
+  processed = processed.replace(/[.۔]([\d\u0660-\u0669\u06F0-\u06F9]+)/g, '__NUM_DOT__$1');
+
+  // 3. Split on remaining sentence-ending dots:
+  const rawParts = processed.split(/[.۔]+/)
+    .map(s => s.replace(/__NUM_DOT__/g, '.').trim())
+    .filter(Boolean);
+
+  // 4. Merge any solitary number within the line into its adjacent sentence
+  const lineSegments = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    const part = rawParts[i];
+    const isOnlyNumber = /^[\s\d\u0660-\u0669\u06F0-\u06F9.۔()\-:]+$/.test(part);
+    if (isOnlyNumber && i + 1 < rawParts.length) {
+      rawParts[i + 1] = part + (part.endsWith('.') ? ' ' : '. ') + rawParts[i + 1];
+    } else if (isOnlyNumber && lineSegments.length > 0) {
+      lineSegments[lineSegments.length - 1] += ' ' + part;
+    } else {
+      lineSegments.push(part);
+    }
+  }
+
+  return lineSegments;
+}
+
 function extractCustomSegments(rawText) {
   if (!rawText) return [];
 
@@ -5129,20 +5164,31 @@ function extractCustomSegments(rawText) {
 
   // 3. Process line by line: each non-empty line is an ayah, and dots (.) within a line also divide ayahs
   const lines = normalized.split('\n');
-  const segments = [];
+  const allSegments = [];
 
   lines.forEach(rawLine => {
     const cleanedLine = cleanMarkdownLine(rawLine);
     if (!cleanedLine) return;
 
-    // Within each non-empty line, check if there are sub-sentences divided by dots (., ۔)
-    const subParts = cleanedLine.split(/[.۔]+/).map(s => s.trim()).filter(s => s.length > 0);
-    if (subParts.length > 0) {
-      subParts.forEach(part => segments.push(part));
-    }
+    const subParts = splitLineIntoSentences(cleanedLine);
+    subParts.forEach(part => allSegments.push(part));
   });
 
-  return segments;
+  // 4. Global safety net: Merge any solitary number across lines into adjacent text
+  const finalSegments = [];
+  for (let i = 0; i < allSegments.length; i++) {
+    const seg = allSegments[i];
+    const isOnlyNumber = /^[\s\d\u0660-\u0669\u06F0-\u06F9.۔()\-:]+$/.test(seg);
+    if (isOnlyNumber && i + 1 < allSegments.length) {
+      allSegments[i + 1] = seg + (seg.endsWith('.') ? ' ' : '. ') + allSegments[i + 1];
+    } else if (isOnlyNumber && finalSegments.length > 0) {
+      finalSegments[finalSegments.length - 1] += ' ' + seg;
+    } else {
+      finalSegments.push(seg);
+    }
+  }
+
+  return finalSegments;
 }
 
 function countCustomSentences(rawText) {
