@@ -189,6 +189,60 @@ body.library-active #viewBtnReading {
   border-radius: 12px;
   padding: 1.5rem 1.75rem;
   margin-bottom: 2.5rem;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.surah-banner.minimized {
+  padding: 10px 14px;
+  margin-bottom: 1.25rem;
+  cursor: pointer;
+}
+
+.surah-banner.minimized .banner-expanded-content {
+  display: none !important;
+}
+
+.surah-banner.minimized .banner-collapsed-bar {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  padding-right: 32px;
+}
+
+.banner-mini-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main, #2b2e35);
+}
+
+.banner-mini-sub {
+  font-size: 0.82rem;
+  color: var(--text-muted, #7c6853);
+}
+
+.banner-collapse-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-muted, #7c6853);
+  transition: all 0.15s ease;
+  z-index: 10;
+}
+
+.banner-collapse-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-main, #2b2319);
 }
 
 .banner-top {
@@ -1431,6 +1485,9 @@ body.memorize-active .audio-bar-wrapper.minimized {
 .dropdown-surah-name {
   font-weight: 500;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 175px;
 }
 .dropdown-due-pill {
   font-size: 0.68rem;
@@ -5000,6 +5057,697 @@ body.memorize-active .vbv-trans-hidden:hover {
 
 .top-sync-btn.sync-state-expired .top-sync-badge {
   background: #ef4444;
+}
+
+/* =========================================================
+   CUSTOM TEXTS & MIXED LANGUAGE SUPPORT
+   ========================================================= */
+
+/* 1. Custom Text Dot Marker (replaces rosette with clean dot button) */
+.ayah-marker.custom-dot-marker {
+  width: auto;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  margin: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+  position: relative;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.custom-dot-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  background: #475569;
+  color: #ffffff;
+  border-radius: 50%;
+  font-size: 0.95rem;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ayah-marker.custom-dot-marker:hover .custom-dot-symbol {
+  background: #d97706;
+  transform: scale(1.35);
+  box-shadow: 0 0 8px rgba(217, 119, 6, 0.7);
+}
+
+.reading-verse-span.ayah-active-span .ayah-marker.custom-dot-marker .custom-dot-symbol,
+.ayah-marker.custom-dot-marker.active-ayah-marker .custom-dot-symbol {
+  background: #b45309;
+  transform: scale(1.4);
+  box-shadow: 0 0 10px rgba(180, 83, 9, 0.85);
+}
+
+.ayah-marker.custom-dot-marker.hidden-ayah {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 2. Custom Text Layout & Mixed Language Formatting */
+.mushaf-page-content.custom-content {
+  direction: ltr;
+  text-align: justify;
+  text-justify: inter-word;
+  padding: 0.5rem 0;
+}
+
+.custom-verse-block {
+  display: block;
+  width: 100%;
+  margin: 0 0 1.25rem 0;
+  box-sizing: border-box;
+  text-align: justify;
+  text-justify: inter-word;
+  position: relative;
+}
+
+.custom-verse-block.sentence-arabic {
+  direction: rtl !important;
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  text-align-last: right !important;
+  font-family: var(--font-arabic, 'Amiri Quran', serif);
+  font-size: var(--arabic-scale, 32px);
+  line-height: var(--arabic-line-height, 2.4);
+}
+
+.custom-verse-block.sentence-latin {
+  direction: ltr !important;
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  text-align-last: left !important;
+  font-family: var(--font-ui, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  font-size: calc(var(--arabic-scale, 32px) * 0.72);
+  line-height: 1.85;
+  letter-spacing: 0.01em;
+  word-spacing: 2px;
+}
+
+/* Mixed word within sentence */
+.custom-verse-block.sentence-arabic .word-latin {
+  font-family: var(--font-ui, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-size: 0.78em;
+}
+
+.custom-verse-block.sentence-latin .word-arabic {
+  font-family: var(--font-arabic, 'Amiri Quran', serif);
+  direction: rtl;
+  unicode-bidi: isolate;
+  font-size: 1.25em;
+}
+
+/* Collapsible Section Container for Custom Texts */
+.custom-section-wrapper {
+  margin-bottom: 2rem;
+  background: transparent;
+}
+
+.custom-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #f7efe1;
+  border: 1px solid #ebdcc4;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.custom-section-header:hover {
+  background: #f1e4d0;
+}
+
+.custom-sec-pill {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #493b2a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-sec-btn {
+  background: #ffffff;
+  border: 1px solid #decab0;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #634f37;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.custom-section-wrapper.collapsed .custom-section-content {
+  display: none !important;
+}
+
+/* 3. Library View Switcher Tabs */
+.lib-view-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 4px;
+  background: #f7efe1;
+  border: 1px solid #ebdcc4;
+  border-radius: 12px;
+}
+
+.lib-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #634f37;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lib-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+  color: #2b2319;
+}
+
+.lib-tab-btn.active {
+  background: #ffffff;
+  color: #2b2319;
+  border-color: #ebdcc4;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.lib-tab-count {
+  font-size: 0.78rem;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: #eee1cc;
+  color: #634f37;
+  font-weight: 700;
+}
+
+.lib-tab-btn.active .lib-tab-count {
+  background: #dfcfb5;
+  color: #2b2319;
+}
+
+.lib-btn-new-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 9px;
+  border: 1px solid #10b981;
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.28);
+}
+
+.lib-btn-new-custom:hover {
+  background: #059669;
+  border-color: #059669;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(16, 185, 129, 0.35);
+}
+
+/* 4. Custom Texts Library Grid & Cards */
+.library-custom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.lib-custom-card {
+  background: #ffffff;
+  border: 1px solid #ebdcc4;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.lib-custom-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(99, 79, 55, 0.12);
+  border-color: #d8c2a3;
+}
+
+.lib-custom-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lib-custom-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lib-custom-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #f7efe1;
+  border: 1px solid #ebdcc4;
+  color: #634f37;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lib-custom-title-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.lib-custom-title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #2b2319;
+  line-height: 1.3;
+}
+
+.lib-custom-category-tag {
+  display: inline-block;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1ebd9;
+  color: #7c6853;
+  margin-top: 3px;
+  align-self: flex-start;
+}
+
+.lib-custom-preview-text {
+  font-size: 0.88rem;
+  color: #64748b;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: auto;
+  unicode-bidi: isolate;
+  background: #fdfbf7;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px dashed #ebdcc4;
+}
+
+.lib-custom-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #8c7860;
+  border-top: 1px solid #f2e7d7;
+  padding-top: 8px;
+}
+
+.lib-custom-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.lib-custom-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lib-custom-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid #decab0;
+  background: #ffffff;
+  color: #493b2a;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lib-custom-btn:hover {
+  background: #f7efe1;
+  color: #2b2319;
+}
+
+.lib-custom-btn.btn-memorize-direct {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.lib-custom-btn.btn-memorize-direct:hover {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.lib-custom-empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3.5rem 1.5rem;
+  background: #ffffff;
+  border: 2px dashed #ebdcc4;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.lib-custom-empty-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.lib-custom-empty-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #2b2319;
+}
+
+.lib-custom-empty-desc {
+  font-size: 0.92rem;
+  color: #7c6853;
+  max-width: 480px;
+  line-height: 1.5;
+}
+
+/* 5. Custom Text Editor Modal */
+.custom-text-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(5px);
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  animation: fadeInModal 0.18s ease-out;
+}
+
+.custom-text-modal-card {
+  background: #ffffff;
+  border: 1px solid #ebdcc4;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.custom-text-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: #fbf6ec;
+  border-bottom: 1px solid #ebdcc4;
+}
+
+.custom-text-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.custom-text-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.custom-text-title-wrap h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #2b2319;
+  font-weight: 700;
+}
+
+.custom-text-sub {
+  font-size: 0.78rem;
+  color: #8c7860;
+  display: block;
+  margin-top: 2px;
+}
+
+.custom-text-close {
+  background: transparent;
+  border: none;
+  font-size: 1.35rem;
+  color: #8c7860;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.custom-text-close:hover {
+  background: #efe4d3;
+  color: #2b2319;
+}
+
+.custom-text-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.custom-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.custom-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.custom-form-group.flex-1 { flex: 1; }
+.custom-form-group.flex-2 { flex: 2; }
+
+.custom-form-group label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #493b2a;
+}
+
+.custom-form-group input,
+.custom-form-group textarea {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #decab0;
+  background: #fdfaf5;
+  font-size: 0.95rem;
+  color: #2b2319;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.custom-form-group textarea {
+  resize: vertical;
+  min-height: 160px;
+  line-height: 1.6;
+}
+
+.custom-form-group input:focus,
+.custom-form-group textarea:focus {
+  outline: none;
+  border-color: #d97706;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18);
+}
+
+.custom-textarea-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.btn-insert-sample {
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-insert-sample:hover {
+  background: #fde68a;
+  color: #78350f;
+}
+
+.custom-text-stats-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #8c7860;
+  font-weight: 600;
+  padding: 4px 6px;
+}
+
+.custom-text-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: #fbf6ec;
+  border-top: 1px solid #ebdcc4;
+}
+
+.btn-delete-custom-text {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-delete-custom-text:hover {
+  background: #fee2e2;
+}
+
+.btn-cancel-custom-modal {
+  background: #ffffff;
+  border: 1px solid #decab0;
+  color: #493b2a;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel-custom-modal:hover {
+  background: #f7efe1;
+}
+
+.btn-save-custom-lib {
+  background: #f59e0b;
+  border: 1px solid #f59e0b;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3);
+}
+
+.btn-save-custom-lib:hover {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.btn-memorize-custom-modal {
+  background: #10b981;
+  border: 1px solid #10b981;
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.35);
+}
+
+.btn-memorize-custom-modal:hover {
+  background: #059669;
+  border-color: #059669;
+}
+
+/* Collapsible Library Dropdown Headers */
+.dropdown-section-header.collapsible-dropdown-header {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.dropdown-section-header.collapsible-dropdown-header:hover {
+  background: #f5ede1 !important;
+}
+.dropdown-sec-arrow {
+  display: inline-block;
+  transition: transform 0.15s ease;
+  font-size: 0.65rem;
+  color: #8c7860;
+}
+
+/* Direct Word Menu Popup (No hover translation pill) */
+.word-hover-tooltip.no-trans-pill {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+.word-hover-tooltip.no-trans-pill::after {
+  display: none !important;
+}
+.word-hover-tooltip.no-trans-pill .word-context-menu {
+  top: 100% !important;
 }
 
 

@@ -103,6 +103,25 @@ const libSearchInput = document.getElementById('libSearchInput');
 const libClearSearchBtn = document.getElementById('libClearSearchBtn');
 const libFilterChips = document.getElementById('libFilterChips');
 const librarySurahGrid = document.getElementById('librarySurahGrid');
+const customTextsGrid = document.getElementById('customTextsGrid');
+const tabQuranSurahs = document.getElementById('tabQuranSurahs');
+const tabCustomTexts = document.getElementById('tabCustomTexts');
+const customTextsCountBadge = document.getElementById('customTextsCountBadge');
+const btnNewCustomText = document.getElementById('btnNewCustomText');
+const customTextModal = document.getElementById('customTextModal');
+const customTextEditId = document.getElementById('customTextEditId');
+const customTextTitleInput = document.getElementById('customTextTitleInput');
+const customTextCategoryInput = document.getElementById('customTextCategoryInput');
+const customTextContentInput = document.getElementById('customTextContentInput');
+const btnDeleteCustomTextModal = document.getElementById('btnDeleteCustomTextModal');
+const customModalHeading = document.getElementById('customModalHeading');
+const customTextSentenceCount = document.getElementById('customTextSentenceCount');
+const customTextWordCount = document.getElementById('customTextWordCount');
+const customTextLangSummary = document.getElementById('customTextLangSummary');
+
+const CUSTOM_TEXTS_STORAGE_KEY = 'quran_custom_texts_store';
+let customTextsStore = [];
+let activeLibraryTab = 'quran'; // 'quran' | 'custom'
 
 const ayahCtxNote = document.getElementById('ayahCtxNote');
 const ayahNoteModal = document.getElementById('ayahNoteModal');
@@ -147,6 +166,8 @@ const viewBtnVbv = document.getElementById('viewBtnVbv');
 const viewBtnMemorize = document.getElementById('viewBtnMemorize');
 const bismillahBlock = document.getElementById('bismillahBlock');
 const btnListen = document.getElementById('btnListen');
+const bannerCollapseBtn = document.getElementById('bannerCollapseBtn');
+const bannerCollapsedBar = document.getElementById('bannerCollapsedBar');
 
 // Memorize Bar Elements
 const memorizeBar = document.getElementById('memorizeBar');
@@ -599,6 +620,18 @@ function getRosetteSvg(number) {
   const lenClass = number >= 100 ? 'digits-3' : '';
   const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
   const noteIndicator = hasNote ? `<span class="ayah-note-indicator" title="Has Reflection / Note">📝</span>` : '';
+
+  if (surahData && surahData.isCustom) {
+    return `
+      <span class="ayah-marker custom-dot-marker ${isHidden ? 'hidden-ayah' : ''} ${overrideClass}" 
+            data-verse="${number}" 
+            id="ayah-marker-${number}"
+            title="Sentence ${number} (Click for options)">
+        <span class="custom-dot-symbol">•</span>
+        ${noteIndicator}
+      </span>
+    `;
+  }
 
   return `
     <span class="ayah-marker ${isHidden ? 'hidden-ayah' : ''} ${overrideClass}" 
@@ -1399,8 +1432,16 @@ function showLibraryView() {
   if (memorizeBar) memorizeBar.classList.remove('show');
   if (btnHomeLibrary) btnHomeLibrary.classList.add('active');
   if (headerSurahTitle) headerSurahTitle.textContent = 'Memorize Quran';
-  if (pageMetaText) pageMetaText.textContent = '114 Surahs • Library';
-  renderSurahLibrary();
+  if (pageMetaText) {
+    pageMetaText.textContent = activeLibraryTab === 'custom' 
+      ? `${customTextsStore.length} Custom Texts • Library` 
+      : '114 Surahs • Library';
+  }
+  if (activeLibraryTab === 'custom') {
+    renderCustomTextsLibrary();
+  } else {
+    renderSurahLibrary();
+  }
 }
 
 function hideLibraryView() {
@@ -1412,11 +1453,15 @@ function hideLibraryView() {
   if (btnHomeLibrary) btnHomeLibrary.classList.remove('active');
   if (surahData) {
     if (bismillahBlock) {
-      bismillahBlock.style.display = (surahData.meta.number === 9 || surahData.meta.number === 1) ? 'none' : 'block';
+      bismillahBlock.style.display = (surahData.isCustom || surahData.meta.number === 9 || surahData.meta.number === 1) ? 'none' : 'block';
     }
-    if (headerSurahTitle) headerSurahTitle.textContent = `${surahData.meta.number}. ${surahData.meta.englishName}`;
+    if (headerSurahTitle) {
+      headerSurahTitle.textContent = surahData.isCustom ? (surahData.meta.englishName || 'Custom Text') : `${surahData.meta.number}. ${surahData.meta.englishName}`;
+    }
     if (pageMetaText && surahData.verses && surahData.verses[0]) {
-      pageMetaText.textContent = `${surahData.verses[0].pageNumber} • ${surahData.verses[0].juzNumber}`;
+      pageMetaText.textContent = surahData.isCustom 
+        ? `${surahData.meta.numberOfAyahs} Sentences • ${surahData.meta.englishNameTranslation || 'Custom'}` 
+        : `${surahData.verses[0].pageNumber} • ${surahData.verses[0].juzNumber}`;
     }
     if (currentView === 'vbv') {
       if (vbvView) vbvView.style.display = 'block';
@@ -1710,14 +1755,74 @@ if (topSurahNewBadge) {
   });
 }
 
+let isDropdownCustomCollapsed = false;
+let isDropdownQuranCollapsed = false;
+
+window.toggleDropdownSection = function(section, e) {
+  if (e) e.stopPropagation();
+  if (section === 'custom') {
+    isDropdownCustomCollapsed = !isDropdownCustomCollapsed;
+    const list = document.getElementById('dropdownCustomList');
+    const arrow = document.getElementById('dropdownCustomArrow');
+    if (list) list.style.display = isDropdownCustomCollapsed ? 'none' : 'block';
+    if (arrow) arrow.textContent = isDropdownCustomCollapsed ? '▼' : '▲';
+  } else if (section === 'quran') {
+    isDropdownQuranCollapsed = !isDropdownQuranCollapsed;
+    const list = document.getElementById('dropdownQuranList');
+    const arrow = document.getElementById('dropdownQuranArrow');
+    const text = document.getElementById('dropdownQuranCollapseText');
+    if (list) list.style.display = isDropdownQuranCollapsed ? 'none' : 'block';
+    if (arrow) arrow.textContent = isDropdownQuranCollapsed ? '▼' : '▲';
+    if (text) text.textContent = isDropdownQuranCollapsed ? 'Expand' : 'Collapse';
+  }
+};
+
 function renderSurahDropdown() {
-  if (!chaptersList || !chaptersList.length || !surahDropdown) return;
-  surahDropdown.innerHTML = chaptersList.map(ch => {
+  if (!surahDropdown) return;
+  let customHtml = '';
+  if (customTextsStore && customTextsStore.length > 0) {
+    const customItemsHtml = customTextsStore.map(ct => {
+      const isActive = surahData && surahData.isCustom && surahData.customId === ct.id;
+      const sCount = countCustomSentences(ct.rawText);
+      return `
+        <div class="dropdown-item ${isActive ? 'active' : ''}" onclick="selectCustomText('${ct.id}')">
+          <div class="dropdown-item-left">
+            <span class="dropdown-surah-name">📝 ${escapeHtml(ct.title)}</span>
+            <span class="dropdown-new-pill" style="background:#e0f2fe; color:#0369a1;">${escapeHtml(ct.category || 'Custom')}</span>
+          </div>
+          <div class="dropdown-item-right">
+            <span class="dropdown-arabic-name" style="font-size:0.8rem;">${sCount} ayahs</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    customHtml = `
+      <div class="dropdown-section-header collapsible-dropdown-header" onclick="toggleDropdownSection('custom', event)" style="padding: 7px 12px; font-size: 0.75rem; font-weight: 700; color: #8c7860; text-transform: uppercase; background: #fdfaf5; border-bottom: 1px solid #ebdcc4; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span id="dropdownCustomArrow" class="dropdown-sec-arrow">${isDropdownCustomCollapsed ? '▼' : '▲'}</span>
+          <span>📝 Custom Texts (${customTextsStore.length})</span>
+        </div>
+        <button type="button" onclick="event.stopPropagation(); openCustomTextModal();" style="border:none; background:transparent; color:#10b981; font-weight:700; cursor:pointer; font-size:0.75rem;">+ New</button>
+      </div>
+      <div id="dropdownCustomList" style="display: ${isDropdownCustomCollapsed ? 'none' : 'block'};">
+        ${customItemsHtml}
+      </div>
+    `;
+  }
+
+  if (!chaptersList || !chaptersList.length) {
+    surahDropdown.innerHTML = customHtml || '<div style="padding: 1rem; color: #8c7860;">Loading chapters...</div>';
+    return;
+  }
+
+  const quranItemsHtml = chaptersList.map(ch => {
     const dueCount = getDueAyahsCountForSurah(ch.number);
     const newCount = getNewAyahsCountForSurah(ch.number, ch.numberOfAyahs);
     const masteryPercent = getSurahMasteryPercent(ch.number, ch.numberOfAyahs);
+    const isActive = (!surahData || !surahData.isCustom) && ch.number === currentSurahNumber;
     return `
-      <div class="dropdown-item ${ch.number === currentSurahNumber ? 'active' : ''}" onclick="selectSurah(${ch.number})">
+      <div class="dropdown-item ${isActive ? 'active' : ''}" onclick="selectSurah(${ch.number})">
         <div class="dropdown-item-left">
           <span class="dropdown-surah-name">${ch.number}. ${ch.englishName}</span>
           ${dueCount > 0 ? `<span class="dropdown-due-pill has-due">${dueCount} due</span>` : ''}
@@ -1730,6 +1835,21 @@ function renderSurahDropdown() {
       </div>
     `;
   }).join('');
+
+  const quranHeaderHtml = `
+    <div class="dropdown-section-header collapsible-dropdown-header" onclick="toggleDropdownSection('quran', event)" style="padding: 7px 12px; font-size: 0.75rem; font-weight: 700; color: #8c7860; text-transform: uppercase; background: #fdfaf5; border-top: 1px solid #ebdcc4; border-bottom: 1px solid #ebdcc4; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span id="dropdownQuranArrow" class="dropdown-sec-arrow">${isDropdownQuranCollapsed ? '▼' : '▲'}</span>
+        <span>📖 Quran Surahs (114)</span>
+      </div>
+      <span id="dropdownQuranCollapseText" style="font-size:0.68rem; font-weight:600; color:#a8947c;">${isDropdownQuranCollapsed ? 'Expand' : 'Collapse'}</span>
+    </div>
+    <div id="dropdownQuranList" style="display: ${isDropdownQuranCollapsed ? 'none' : 'block'};">
+      ${quranItemsHtml}
+    </div>
+  `;
+
+  surahDropdown.innerHTML = customHtml + quranHeaderHtml;
 }
 
 async function initChapters() {
@@ -1942,7 +2062,32 @@ async function loadSurah(num) {
 
 function updateBanner() {
   const { meta, verses } = surahData;
-  const first = verses[0];
+  const first = verses[0] || {};
+  const bannerMiniTitle = document.getElementById('bannerMiniTitle');
+  const bannerMiniSub = document.getElementById('bannerMiniSub');
+  const bannerControls = document.getElementById('bannerControls');
+
+  if (surahData && surahData.isCustom) {
+    if (!isLibraryView) {
+      headerSurahTitle.textContent = meta.englishName || 'Custom Text';
+      pageMetaText.textContent = `${meta.numberOfAyahs} Sentences • ${meta.englishNameTranslation || 'Custom'}`;
+    }
+    updateTopSurahDueBadge();
+    renderSurahDropdown();
+    document.getElementById('bannerTitle').textContent = meta.englishName || 'Custom Text';
+    document.getElementById('bannerSubName').textContent = `${meta.numberOfAyahs} Sentences • ${meta.englishNameTranslation || 'Custom'}`;
+    document.getElementById('bannerArabicCalligraphy').textContent = '📝';
+    bismillahBlock.style.display = 'none';
+    if (bannerMiniTitle) bannerMiniTitle.textContent = meta.englishName || 'Custom Text';
+    if (bannerMiniSub) bannerMiniSub.textContent = `• ${meta.numberOfAyahs} Sentences (${meta.englishNameTranslation || 'Custom'})`;
+    if (bannerControls) bannerControls.style.display = 'none';
+
+    const surahBanner = document.getElementById('surahBanner');
+    if (surahBanner) {
+      surahBanner.style.display = isLibraryView ? 'none' : 'flex';
+    }
+    return;
+  }
 
   if (!isLibraryView) {
     headerSurahTitle.textContent = `${meta.number}. ${meta.englishName}`;
@@ -1954,11 +2099,160 @@ function updateBanner() {
   document.getElementById('bannerSubName').textContent = meta.englishNameTranslation;
   document.getElementById('bannerArabicCalligraphy').textContent = meta.name.replace('سُورَةُ ', '');
   bismillahBlock.style.display = (meta.number === 9 || meta.number === 1 || isLibraryView) ? 'none' : 'block';
+  if (bannerMiniTitle) bannerMiniTitle.textContent = `${meta.number}. Surah ${meta.englishName}`;
+  if (bannerMiniSub) bannerMiniSub.textContent = `• ${meta.englishNameTranslation}`;
+  if (bannerControls) bannerControls.style.display = 'flex';
+
   const surahBanner = document.getElementById('surahBanner');
   if (surahBanner) {
     surahBanner.style.display = isLibraryView ? 'none' : 'flex';
   }
 }
+
+function isVerseArabic(verse) {
+  const fullText = (verse.words || []).map(w => w.arabic || '').join(' ');
+  const arCount = (fullText.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g) || []).length;
+  const ltCount = (fullText.match(/[a-zA-Z]/g) || []).length;
+  return arCount >= ltCount;
+}
+
+function renderCustomReadingView() {
+  const { verses } = surahData;
+  const arVerses = verses.filter(v => isVerseArabic(v));
+  const ltVerses = verses.filter(v => !isVerseArabic(v));
+  const hasBothLanguages = arVerses.length > 0 && ltVerses.length > 0;
+
+  const renderVerseBlock = (verse) => {
+    const vIdx = verse.vIdx !== undefined ? verse.vIdx : (verse.verseNumber - 1);
+    const isAr = isVerseArabic(verse);
+    let wordsHtml = '';
+    verse.words.forEach((w, wIdx) => {
+      const gIdx = verse.startWordIdx + wIdx;
+      const wordDisplay = isHarakatVisible ? w.arabic : w.plain;
+      const wordKey = `${surahData.meta.number}:${verse.verseNumber}:${wIdx + 1}`;
+      const isMistake = !!memorizeMistakes[wordKey];
+
+      const wordIsAr = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(w.arabic);
+      let scriptClass = '';
+      if (isAr && !wordIsAr) scriptClass = 'word-latin';
+      else if (!isAr && wordIsAr) scriptClass = 'word-arabic';
+
+      wordsHtml += `
+        <span class="mushaf-word ${scriptClass} ${isMistake ? 'word-mistake' : ''}" 
+              id="m-word-${gIdx}"
+              data-global-idx="${gIdx}"
+              data-verse-idx="${vIdx}" 
+              data-verse-num="${verse.verseNumber}"
+              data-word-idx="${wIdx}"
+              data-orig-arabic="${escapeHtml(w.arabic)}"
+              data-plain-arabic="${escapeHtml(w.plain)}"
+              data-trans="" 
+              data-translit="">
+          ${escapeHtml(wordDisplay)}
+        </span> `;
+    });
+
+    return `
+      <div class="mushaf-verse-span reading-verse-span custom-verse-block ${isAr ? 'sentence-arabic' : 'sentence-latin'}" 
+           id="reading-verse-span-${vIdx}" 
+           data-verse-idx="${vIdx}" 
+           data-verse-num="${verse.verseNumber}" 
+           dir="${isAr ? 'rtl' : 'ltr'}">
+        ${wordsHtml}
+        ${getRosetteSvg(verse.verseNumber)}
+      </div>
+    `;
+  };
+
+  let contentHtml = '';
+  if (hasBothLanguages) {
+    contentHtml = `
+      <div class="custom-section-wrapper" id="customSection_ar">
+        <div class="custom-section-header" onclick="toggleCustomSection('ar')">
+          <span class="custom-sec-pill">🇸🇦 Arabic Sentences (${arVerses.length} ayahs)</span>
+          <button type="button" class="custom-sec-btn" id="btnCustomSec_ar">▲</button>
+        </div>
+        <div class="custom-section-content" id="customSecContent_ar">
+          ${arVerses.map(v => renderVerseBlock(v)).join('')}
+        </div>
+      </div>
+
+      <div class="custom-section-wrapper" id="customSection_en">
+        <div class="custom-section-header" onclick="toggleCustomSection('en')">
+          <span class="custom-sec-pill">🇬🇧 English Translation (${ltVerses.length} ayahs)</span>
+          <button type="button" class="custom-sec-btn" id="btnCustomSec_en">▲</button>
+        </div>
+        <div class="custom-section-content" id="customSecContent_en">
+          ${ltVerses.map(v => renderVerseBlock(v)).join('')}
+        </div>
+      </div>
+    `;
+  } else {
+    contentHtml = `
+      <div class="custom-section-wrapper" id="customSection_all">
+        <div class="custom-section-header" onclick="toggleCustomSection('all')">
+          <span class="custom-sec-pill">📝 Sentences (${verses.length} ayahs)</span>
+          <button type="button" class="custom-sec-btn" id="btnCustomSec_all">▲</button>
+        </div>
+        <div class="custom-section-content" id="customSecContent_all">
+          ${verses.map(v => renderVerseBlock(v)).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  readingView.innerHTML = `
+    <div class="mushaf-page">
+      <div class="mushaf-page-content custom-content">
+        ${contentHtml}
+      </div>
+      <div class="page-footer-number">${escapeHtml(surahData.meta.englishName || 'Custom Text')}</div>
+    </div>
+  `;
+
+  totalWordElements = Array.from(readingView.querySelectorAll('.mushaf-word'));
+  totalWordElements.sort((a, b) => parseInt(a.getAttribute('data-global-idx')) - parseInt(b.getAttribute('data-global-idx')));
+  totalAyahMarkers = Array.from(readingView.querySelectorAll('.ayah-marker'));
+
+  if (isMemorizeMode) {
+    applyMemorizeState(true);
+  }
+  if (isMultiSelectMode && multiSelectedWordKeys.size > 0) {
+    totalWordElements.forEach(el => {
+      const vNum = parseInt(el.getAttribute('data-verse-num'));
+      const wIdx = parseInt(el.getAttribute('data-word-idx'));
+      const key = `${currentSurahNumber}:${vNum}:${wIdx + 1}`;
+      if (multiSelectedWordKeys.has(key)) {
+        el.classList.add('word-multiselected');
+      }
+    });
+  }
+  updateActiveMistakeButtonState();
+  updateMemorizeOverridesStats();
+}
+
+function toggleBannerCollapse() {
+  const surahBanner = document.getElementById('surahBanner');
+  const bannerCollapseBtn = document.getElementById('bannerCollapseBtn');
+  if (!surahBanner) return;
+
+  const isMin = surahBanner.classList.toggle('minimized');
+  if (bannerCollapseBtn) {
+    bannerCollapseBtn.textContent = isMin ? '▼' : '▲';
+    bannerCollapseBtn.title = isMin ? 'Expand Banner' : 'Collapse Banner';
+  }
+}
+
+window.toggleCustomSection = function(secKey) {
+  const content = document.getElementById(`customSecContent_${secKey}`);
+  const btn = document.getElementById(`btnCustomSec_${secKey}`);
+  if (!content) return;
+  const isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? 'block' : 'none';
+  if (btn) {
+    btn.textContent = isHidden ? '▲' : '▼';
+  }
+};
 
 function renderViews() {
   // Lazy render: only render the active view to avoid unnecessary DOM operations
@@ -1970,6 +2264,10 @@ function renderViews() {
 }
 
 function renderReadingView() {
+  if (surahData && surahData.isCustom) {
+    renderCustomReadingView();
+    return;
+  }
   const { verses } = surahData;
   const pagesMap = {};
 
@@ -1992,8 +2290,14 @@ function renderReadingView() {
         const wordDisplay = isHarakatVisible ? w.arabic : w.plain;
         const wordKey = `${surahData.meta.number}:${verse.verseNumber}:${wIdx + 1}`;
         const isMistake = !!memorizeMistakes[wordKey];
+        const langClass = (surahData && surahData.isCustom && typeof w.isArabic === 'boolean')
+          ? (w.isArabic ? 'word-arabic' : 'word-latin')
+          : '';
+        const wordDir = (surahData && surahData.isCustom && typeof w.isArabic === 'boolean')
+          ? (w.isArabic ? 'rtl' : 'ltr')
+          : '';
         wordsHtml += `
-          <span class="mushaf-word ${isMistake ? 'word-mistake' : ''}" 
+          <span class="mushaf-word ${langClass} ${isMistake ? 'word-mistake' : ''}" 
                 id="m-word-${globalWordIndex}"
                 data-global-idx="${globalWordIndex}"
                 data-verse-idx="${verse.vIdx}" 
@@ -2001,8 +2305,9 @@ function renderReadingView() {
                 data-word-idx="${wIdx}"
                 data-orig-arabic="${w.arabic}"
                 data-plain-arabic="${w.plain}"
-                data-trans="${w.translation}" 
-                data-translit="${w.transliteration}">
+                data-trans="${w.translation || ''}" 
+                data-translit="${w.transliteration || ''}"
+                ${wordDir ? `dir="${wordDir}"` : ''}>
             ${wordDisplay}
           </span> 
         `;
@@ -2010,7 +2315,7 @@ function renderReadingView() {
       });
 
       contentHtml += `
-        <span class="mushaf-verse-span reading-verse-span" id="reading-verse-span-${verse.vIdx}" data-verse-idx="${verse.vIdx}" data-verse-num="${verse.verseNumber}">
+        <span class="mushaf-verse-span reading-verse-span ${surahData && surahData.isCustom ? 'custom-verse-span' : ''}" id="reading-verse-span-${verse.vIdx}" data-verse-idx="${verse.vIdx}" data-verse-num="${verse.verseNumber}" ${surahData && surahData.isCustom ? 'dir="auto"' : ''}>
           ${wordsHtml}
           ${getRosetteSvg(verse.verseNumber)}
         </span>
@@ -2019,8 +2324,8 @@ function renderReadingView() {
 
     html += `
       <div class="mushaf-page">
-        <div class="mushaf-page-content">${contentHtml}</div>
-        <div class="page-footer-number">${pageNumber}</div>
+        <div class="mushaf-page-content ${surahData && surahData.isCustom ? 'custom-content' : ''}">${contentHtml}</div>
+        <div class="page-footer-number">${surahData && surahData.isCustom ? (surahData.meta.englishName || 'Custom Text') : pageNumber}</div>
         ${pIndex < pageKeys.length - 1 ? '<hr class="page-divider" />' : ''}
       </div>
     `;
@@ -2964,7 +3269,9 @@ function showAyahContextMenu(verseNum, x, y) {
   activeAyahContextVerse = verseNum;
   const ayahKey = `${currentSurahNumber}:${verseNum}`;
   if (ayahCtxHeader) {
-    ayahCtxHeader.textContent = `Ayah ${currentSurahNumber}:${verseNum}`;
+    ayahCtxHeader.textContent = (surahData && surahData.isCustom) 
+      ? `Sentence ${verseNum}` 
+      : `Ayah ${currentSurahNumber}:${verseNum}`;
   }
 
   const override = ayahVisOverrides[ayahKey];
@@ -3082,19 +3389,23 @@ function hideAyahContextMenu() {
             }
           }
         } else {
-          // Word is already revealed or pinned visible
-          if (wordPopupTrigger === 'tap') {
-            e.stopPropagation();
-            showWordTooltip(wordEl);
+          // Word is already revealed or pinned visible: tap on word to show menu!
+          e.stopPropagation();
+          if (wordHoverTooltip && wordHoverTooltip.classList.contains('show') && activeHoveredWordEl === wordEl && wordContextMenu.classList.contains('show')) {
+            hideWordTooltip();
+          } else {
+            showWordTooltip(wordEl, true);
           }
         }
         return;
       }
 
-      // 4. Normal view (Reading View / VBV View)
-      if (wordPopupTrigger === 'tap') {
-        e.stopPropagation();
-        showWordTooltip(wordEl);
+      // 4. Normal view (Reading View / VBV View): tap on word to show menu!
+      e.stopPropagation();
+      if (wordHoverTooltip && wordHoverTooltip.classList.contains('show') && activeHoveredWordEl === wordEl && wordContextMenu.classList.contains('show')) {
+        hideWordTooltip();
+      } else {
+        showWordTooltip(wordEl, true);
       }
       return;
     }
@@ -3379,6 +3690,19 @@ btnListen.addEventListener('click', () => {
     btnListen.textContent = '▶';
   }
 });
+
+if (bannerCollapseBtn) {
+  bannerCollapseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleBannerCollapse();
+  });
+}
+if (bannerCollapsedBar) {
+  bannerCollapsedBar.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleBannerCollapse();
+  });
+}
 
 mainPlayPauseBtn.addEventListener('click', () => {
   if (currentAudioIndex === -1) {
@@ -3749,7 +4073,13 @@ wordHoverTooltip.addEventListener('mouseleave', () => {
 function showWordTooltip(wordEl, autoShowContextMenu = false) {
   const vIdx = parseInt(wordEl.getAttribute('data-verse-idx'));
   const wIdx = parseInt(wordEl.getAttribute('data-word-idx'));
-  const trans = wordEl.getAttribute('data-trans') || '[We] created';
+  const trans = wordEl.getAttribute('data-trans') || '';
+
+  // For custom texts or any word without translation:
+  // Suppress hover tooltip unless explicitly opening context menu (right-click / tap)
+  if (!trans && !autoShowContextMenu) {
+    return;
+  }
 
   activeHoveredWordData = { verseIndex: vIdx, wordIndex: wIdx, element: wordEl };
 
@@ -3759,21 +4089,48 @@ function showWordTooltip(wordEl, autoShowContextMenu = false) {
   activeHoveredWordEl = wordEl;
   wordEl.classList.add('active-word');
 
+  const isCustom = !!(surahData && surahData.isCustom);
+  if (!trans && autoShowContextMenu) {
+    wordHoverTooltip.classList.add('no-trans-pill');
+    if (wordTooltipDotsBtn) wordTooltipDotsBtn.style.display = 'none';
+  } else {
+    wordHoverTooltip.classList.remove('no-trans-pill');
+    if (wordTooltipDotsBtn) wordTooltipDotsBtn.style.display = 'block';
+  }
+
   wordTooltipTransText.textContent = trans;
+  if (wordTooltipTransBtn) {
+    wordTooltipTransBtn.style.display = trans ? 'inline-flex' : 'none';
+  }
   const rect = wordEl.getBoundingClientRect();
   wordHoverTooltip.style.left = `${rect.left + rect.width / 2}px`;
   wordHoverTooltip.style.top = `${rect.top + window.scrollY}px`;
   wordHoverTooltip.classList.add('show');
+
   if (autoShowContextMenu) {
     wordContextMenu.classList.add('show');
+    // Ensure menu does not overflow viewport right edge
+    const menuRect = wordContextMenu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth - 12) {
+      wordContextMenu.style.left = 'auto';
+      wordContextMenu.style.right = '0';
+    } else {
+      wordContextMenu.style.left = '0';
+      wordContextMenu.style.right = 'auto';
+    }
   } else {
     wordContextMenu.classList.remove('show');
   }
 
   // Update context menu labels for this word
-  const verse = surahData.verses[vIdx];
+  const verse = surahData && surahData.verses ? surahData.verses[vIdx] : null;
+  if (!verse) return;
   const wordPos = wIdx + 1;
   const wordKey = `${currentSurahNumber}:${verse.verseNumber}:${wordPos}`;
+
+  if (ctxItemMore) ctxItemMore.style.display = isCustom ? 'none' : 'flex';
+  const ctxItemPlayWord = document.getElementById('ctxItemPlayWord');
+  if (ctxItemPlayWord) ctxItemPlayWord.style.display = isCustom ? 'none' : 'flex';
 
   if (ctxMistakeLabel) {
     ctxMistakeLabel.textContent = memorizeMistakes[wordKey] ? 'Mark Mistake Again (+1)' : 'Mark as Mistake';
@@ -3792,6 +4149,8 @@ function showWordTooltip(wordEl, autoShowContextMenu = false) {
 
 function hideWordTooltip() {
   wordHoverTooltip.classList.remove('show');
+  wordHoverTooltip.classList.remove('no-trans-pill');
+  if (wordTooltipDotsBtn) wordTooltipDotsBtn.style.display = 'block';
   wordContextMenu.classList.remove('show');
   if (activeHoveredWordEl) {
     activeHoveredWordEl.classList.remove('active-word');
@@ -4288,7 +4647,11 @@ if (libSearchInput) {
     if (libClearSearchBtn) {
       libClearSearchBtn.style.display = currentLibrarySearch ? 'block' : 'none';
     }
-    renderSurahLibrary();
+    if (activeLibraryTab === 'custom') {
+      renderCustomTextsLibrary();
+    } else {
+      renderSurahLibrary();
+    }
   });
 }
 
@@ -4297,7 +4660,11 @@ if (libClearSearchBtn) {
     libSearchInput.value = '';
     currentLibrarySearch = '';
     libClearSearchBtn.style.display = 'none';
-    renderSurahLibrary();
+    if (activeLibraryTab === 'custom') {
+      renderCustomTextsLibrary();
+    } else {
+      renderSurahLibrary();
+    }
     libSearchInput.focus();
   });
 }
@@ -4327,29 +4694,32 @@ function openWordDetailModal(verseIdx, wordIdx) {
 function renderModalContent() {
   const { meta, verses } = surahData;
   const verse = verses[modalSelectedWord.verseIndex];
-  const word = verse.words[modalSelectedWord.wordIndex];
+  if (!verse) return;
+  const word = verse.words ? verse.words[modalSelectedWord.wordIndex] : null;
 
   wdSurahPill.textContent = `${meta.englishName} ▾`;
   wdAyahPill.textContent = `${verse.verseNumber} ▾`;
-  wdVerseKeyText.textContent = `${verse.verseKey}`;
-  wdBannerTranslation.textContent = word ? word.translation : '[We] created';
-  wdBannerTransliteration.textContent = word ? word.transliteration : 'khalaqnā';
+  wdVerseKeyText.textContent = `${verse.verseKey || (meta.number + ':' + verse.verseNumber)}`;
+  wdBannerTranslation.textContent = word && word.translation ? word.translation : '';
+  wdBannerTransliteration.textContent = word && word.transliteration ? word.transliteration : '';
 
   let arabicVerseHtml = '';
-  verse.words.forEach((w, idx) => {
-    const isSelected = idx === modalSelectedWord.wordIndex;
-    arabicVerseHtml += `
-      <span class="${isSelected ? 'wd-arabic-word-highlight' : ''}" 
-            style="cursor:pointer; margin: 0 3px;"
-            onclick="changeModalWord(${idx})">
-        ${isHarakatVisible ? w.arabic : w.plain}
-      </span>
-    `;
-  });
+  if (verse.words) {
+    verse.words.forEach((w, idx) => {
+      const isSelected = idx === modalSelectedWord.wordIndex;
+      arabicVerseHtml += `
+        <span class="${isSelected ? 'wd-arabic-word-highlight' : ''}" 
+              style="cursor:pointer; margin: 0 3px;"
+              onclick="changeModalWord(${idx})">
+          ${isHarakatVisible ? w.arabic : w.plain}
+        </span>
+      `;
+    });
+  }
   arabicVerseHtml += getRosetteSvg(verse.verseNumber);
   wdArabicVerseContainer.innerHTML = arabicVerseHtml;
-  wdTransEnText.textContent = verse.translationEn;
-  wdTransIdText.textContent = verse.translationId;
+  wdTransEnText.textContent = verse.translationEn || '';
+  wdTransIdText.textContent = verse.translationId || '';
 }
 
 window.changeModalWord = function(newWordIdx) {
@@ -4640,7 +5010,7 @@ document.addEventListener('click', (e) => {
   if (ayahContextMenu && !ayahContextMenu.contains(e.target) && !e.target.closest('.ayah-marker')) {
     hideAyahContextMenu();
   }
-  if (wordPopupTrigger === 'tap' && wordHoverTooltip && !wordHoverTooltip.contains(e.target) && !e.target.closest('.mushaf-word')) {
+  if (wordHoverTooltip && !wordHoverTooltip.contains(e.target) && !e.target.closest('.mushaf-word')) {
     hideWordTooltip();
   }
 });
@@ -4653,6 +5023,472 @@ window.selectSurah = function(id) {
   loadSurah(id);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
+
+// =========================================================
+// CUSTOM TEXTS & MIXED LANGUAGE SYSTEM
+// =========================================================
+
+function countCustomSentences(rawText) {
+  if (!rawText) return 0;
+  const segments = rawText.split(/[.۔]+/).map(s => s.trim()).filter(s => s.length > 0);
+  return segments.length;
+}
+
+function parseCustomTextToSurahData(customText) {
+  const text = customText.rawText || '';
+  const rawSegments = text.split(/[.۔]+/).map(s => s.trim()).filter(s => s.length > 0);
+
+  let globalWordCounter = 0;
+  const verses = rawSegments.map((sentence, idx) => {
+    const vNum = idx + 1;
+    const rawWords = sentence.split(/\s+/).filter(w => w.trim().length > 0);
+    const wordList = rawWords.map((w, wIdx) => {
+      const isArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(w);
+      return {
+        arabic: w,
+        plain: w.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, ''),
+        translation: '',
+        transliteration: '',
+        isArabic: isArabic
+      };
+    });
+
+    const startIdx = globalWordCounter;
+    globalWordCounter += wordList.length;
+    const endIdx = globalWordCounter > 0 ? (globalWordCounter - 1) : 0;
+
+    return {
+      vIdx: idx,
+      verseNumber: vNum,
+      verseKey: `${customText.id}:${vNum}`,
+      pageNumber: 1,
+      juzNumber: 1,
+      hizbNumber: 1,
+      words: wordList,
+      startWordIdx: startIdx,
+      endWordIdx: endIdx,
+      translationEn: '',
+      translationId: '',
+      audioUrl: null
+    };
+  });
+
+  return {
+    isCustom: true,
+    customId: customText.id,
+    meta: {
+      number: customText.id,
+      name: customText.title,
+      englishName: customText.title,
+      englishNameTranslation: customText.category || 'Custom Text',
+      numberOfAyahs: verses.length
+    },
+    verses: verses
+  };
+}
+
+function loadCustomTextsStore() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TEXTS_STORAGE_KEY);
+    if (raw) {
+      customTextsStore = JSON.parse(raw) || [];
+    } else {
+      customTextsStore = [];
+    }
+  } catch (e) {
+    console.warn('Failed to parse custom texts store:', e);
+    customTextsStore = [];
+  }
+}
+
+function saveCustomTextsStore() {
+  try {
+    localStorage.setItem(CUSTOM_TEXTS_STORAGE_KEY, JSON.stringify(customTextsStore));
+    if (typeof markUnsyncedChanges === 'function') markUnsyncedChanges();
+  } catch (e) {
+    console.warn('Failed to save custom texts store:', e);
+  }
+}
+
+function seedSampleCustomTextsIfEmpty() {
+  if (!customTextsStore || customTextsStore.length === 0) {
+    const sample = {
+      id: 'custom_sample_intentions',
+      title: 'Hadith of Intentions • حديث النيات',
+      category: 'Hadith',
+      rawText: `عَنْ عُمَرَ بْنِ الْخَطَّابِ رَضِيَ اللَّهُ عَنْهُ قَالَ: سَمِعْتُ رَسُولَ اللَّهِ ﷺ يَقُولُ.
+إنَّمَا الأَعْمَالُ بِالنِّيَّاتِ.
+وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى.
+فَمَنْ كَانَتْ هِجْرَتُهُ إِلَى اللَّهِ وَرَسُولِهِ، فَهِجْرَتُهُ إِلَى اللَّهِ وَرَسُولِهِ.
+وَمَنْ كَانَتْ هِجْرَتُهُ لِدُنْيَا يُصِيبُهَا أَوْ امْرَأَةٍ يَنْكِحُهَا، فَهِجْرَتُهُ إِلَى مَا هَاجَرَ إِلَيْهِ.
+Narrated by Umar ibn Al-Khattab may Allah be pleased with him: I heard the Messenger of Allah ﷺ say.
+Actions are judged solely by intentions.
+And every person will have only what they intended.
+So whoever emigrated for Allah and His Messenger, his emigration is for Allah and His Messenger.
+And whoever emigrated for worldly benefit or to marry a woman, his emigration is for what he emigrated for.`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    customTextsStore = [sample];
+    saveCustomTextsStore();
+  }
+}
+
+function initCustomTexts() {
+  loadCustomTextsStore();
+  seedSampleCustomTextsIfEmpty();
+  if (customTextsCountBadge) {
+    customTextsCountBadge.textContent = customTextsStore.length;
+  }
+  if (customTextContentInput) {
+    customTextContentInput.addEventListener('input', updateCustomTextStatsBar);
+  }
+  if (customTextModal) {
+    customTextModal.addEventListener('click', (e) => {
+      if (e.target === customTextModal) closeCustomTextModal();
+    });
+  }
+}
+
+function switchLibraryTab(tab) {
+  activeLibraryTab = tab;
+  if (tabQuranSurahs) tabQuranSurahs.classList.toggle('active', tab === 'quran');
+  if (tabCustomTexts) tabCustomTexts.classList.toggle('active', tab === 'custom');
+
+  if (tab === 'quran') {
+    if (librarySurahGrid) librarySurahGrid.style.display = 'grid';
+    if (customTextsGrid) customTextsGrid.style.display = 'none';
+    if (libFilterChips) libFilterChips.style.display = 'flex';
+    if (libSearchInput) libSearchInput.placeholder = 'Search Surah by name, number, or translation...';
+    if (pageMetaText) pageMetaText.textContent = '114 Surahs • Library';
+    renderSurahLibrary();
+  } else {
+    if (librarySurahGrid) librarySurahGrid.style.display = 'none';
+    if (customTextsGrid) customTextsGrid.style.display = 'grid';
+    if (libFilterChips) libFilterChips.style.display = 'none';
+    if (libSearchInput) libSearchInput.placeholder = 'Search custom texts by title, tag, or content...';
+    if (pageMetaText) pageMetaText.textContent = `${customTextsStore.length} Custom Texts • Library`;
+    renderCustomTextsLibrary();
+  }
+}
+
+function renderCustomTextsLibrary() {
+  if (!customTextsGrid) return;
+  if (customTextsCountBadge) {
+    customTextsCountBadge.textContent = customTextsStore.length;
+  }
+
+  // Update banner stats for custom texts
+  if (libStatsSummary && activeLibraryTab === 'custom') {
+    const totalCount = customTextsStore.length;
+    let totalSentences = 0;
+    let totalWords = 0;
+    customTextsStore.forEach(ct => {
+      totalSentences += countCustomSentences(ct.rawText);
+      totalWords += (ct.rawText || '').split(/\s+/).filter(Boolean).length;
+    });
+    libStatsSummary.innerHTML = `
+      <span class="lib-stat-pill">📝 ${totalCount} Custom ${totalCount === 1 ? 'Text' : 'Texts'}</span>
+      <span class="lib-stat-pill stat-due">⚡ ${totalSentences} Total Sentences (Ayahs)</span>
+      <span class="lib-stat-pill stat-mastery">📚 ${totalWords} Words</span>
+    `;
+  }
+
+  const query = (currentLibrarySearch || '').trim().toLowerCase();
+  const list = customTextsStore.filter(ct => {
+    if (!query) return true;
+    const matchTitle = (ct.title || '').toLowerCase().includes(query);
+    const matchCat = (ct.category || '').toLowerCase().includes(query);
+    const matchContent = (ct.rawText || '').toLowerCase().includes(query);
+    return matchTitle || matchCat || matchContent;
+  });
+
+  if (list.length === 0) {
+    if (customTextsStore.length === 0) {
+      customTextsGrid.innerHTML = `
+        <div class="lib-custom-empty-state">
+          <div class="lib-custom-empty-icon">📝</div>
+          <div class="lib-custom-empty-title">Your Custom Texts Library is Empty</div>
+          <div class="lib-custom-empty-desc">
+            Save any text here to memorize it sentence-by-sentence! Every sentence up to a dot (.) becomes an Ayah with a simple dot button. Full mixed Arabic & English support.
+          </div>
+          <button type="button" class="lib-btn-new-custom" onclick="openCustomTextModal()" style="margin-top: 8px;">
+            <span>➕ Create Your First Custom Text</span>
+          </button>
+        </div>
+      `;
+    } else {
+      customTextsGrid.innerHTML = `
+        <div style="grid-column: 1/-1; text-align:center; padding: 4rem 1rem; color: #8c7860;">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">🔍</div>
+          <div style="font-size: 1.05rem; font-weight:600;">No custom texts match "${escapeHtml(query)}"</div>
+          <div style="font-size: 0.85rem; margin-top: 4px;">Try a different keyword or create a new custom text.</div>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  customTextsGrid.innerHTML = list.map(ct => {
+    const sCount = countCustomSentences(ct.rawText);
+    const wCount = (ct.rawText || '').split(/\s+/).filter(Boolean).length;
+    const cleanPreview = (ct.rawText || '').replace(/\s+/g, ' ').slice(0, 150);
+    return `
+      <div class="lib-custom-card" onclick="selectCustomText('${ct.id}')">
+        <div class="lib-custom-card-top">
+          <div class="lib-custom-title-row">
+            <div class="lib-custom-icon-badge">📝</div>
+            <div class="lib-custom-title-info">
+              <span class="lib-custom-title">${escapeHtml(ct.title)}</span>
+              <span class="lib-custom-category-tag">${escapeHtml(ct.category || 'Custom')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="lib-custom-preview-text" dir="auto">${escapeHtml(cleanPreview)}...</div>
+
+        <div class="lib-custom-meta-row">
+          <div class="lib-custom-stats">
+            <span>⚡ ${sCount} sentences</span>
+            <span>•</span>
+            <span>${wCount} words</span>
+          </div>
+          <div class="lib-custom-actions" onclick="event.stopPropagation()">
+            <button type="button" class="lib-custom-btn btn-memorize-direct" onclick="memorizeCustomTextDirect('${ct.id}', event)" title="Open in Memorize Mode">
+              🧠 Memorize
+            </button>
+            <button type="button" class="lib-custom-btn" onclick="openCustomTextModal('${ct.id}')" title="Edit Text">
+              ✏️
+            </button>
+            <button type="button" class="lib-custom-btn" onclick="deleteCustomText('${ct.id}')" title="Delete Text" style="color:#b91c1c;">
+              🗑️
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openCustomTextModal(customTextId = null) {
+  if (customTextId) {
+    const ct = customTextsStore.find(c => c.id === customTextId);
+    if (!ct) return;
+    if (customModalHeading) customModalHeading.textContent = 'Edit Custom Text';
+    if (customTextEditId) customTextEditId.value = ct.id;
+    if (customTextTitleInput) customTextTitleInput.value = ct.title || '';
+    if (customTextCategoryInput) customTextCategoryInput.value = ct.category || '';
+    if (customTextContentInput) customTextContentInput.value = ct.rawText || '';
+    if (btnDeleteCustomTextModal) btnDeleteCustomTextModal.style.display = 'inline-flex';
+  } else {
+    if (customModalHeading) customModalHeading.textContent = 'New Custom Text';
+    if (customTextEditId) customTextEditId.value = '';
+    if (customTextTitleInput) customTextTitleInput.value = '';
+    if (customTextCategoryInput) customTextCategoryInput.value = '';
+    if (customTextContentInput) customTextContentInput.value = '';
+    if (btnDeleteCustomTextModal) btnDeleteCustomTextModal.style.display = 'none';
+  }
+  updateCustomTextStatsBar();
+  if (customTextModal) customTextModal.style.display = 'flex';
+  setTimeout(() => {
+    if (customTextTitleInput) customTextTitleInput.focus();
+  }, 50);
+}
+
+function closeCustomTextModal() {
+  if (customTextModal) customTextModal.style.display = 'none';
+}
+
+function updateCustomTextStatsBar() {
+  if (!customTextContentInput) return;
+  const text = customTextContentInput.value || '';
+  const sCount = countCustomSentences(text);
+  const wCount = text.split(/\s+/).filter(Boolean).length;
+  const hasArabic = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+  const hasLatin = /[a-zA-Z]/.test(text);
+
+  let langDesc = 'Mixed / Auto';
+  if (hasArabic && hasLatin) langDesc = '🌐 Mixed Arabic & English';
+  else if (hasArabic) langDesc = '🇸🇦 Arabic Text';
+  else if (hasLatin) langDesc = '🇬🇧 English / Latin';
+
+  if (customTextSentenceCount) customTextSentenceCount.textContent = `${sCount} ${sCount === 1 ? 'sentence' : 'sentences'} (ayahs)`;
+  if (customTextWordCount) customTextWordCount.textContent = `${wCount} words`;
+  if (customTextLangSummary) customTextLangSummary.textContent = langDesc;
+}
+
+function insertSampleCustomText() {
+  if (!customTextContentInput) return;
+  if (!customTextTitleInput.value) {
+    customTextTitleInput.value = 'Hadith of Intentions • حديث النيات';
+  }
+  if (!customTextCategoryInput.value) {
+    customTextCategoryInput.value = 'Hadith';
+  }
+  customTextContentInput.value = `عَنْ عُمَرَ بْنِ الْخَطَّابِ رَضِيَ اللَّهُ عَنْهُ قَالَ: سَمِعْتُ رَسُولَ اللَّهِ ﷺ يَقُولُ.
+إنَّمَا الأَعْمَالُ بِالنِّيَّاتِ.
+وَإِنَّمَا لِكُلِّ امْرِئٍ مَا نَوَى.
+فَمَنْ كَانَتْ هِجْرَتُهُ إِلَى اللَّهِ وَرَسُولِهِ، فَهِجْرَتُهُ إِلَى اللَّهِ وَرَسُولِهِ.
+وَمَنْ كَانَتْ هِجْرَتُهُ لِدُنْيَا يُصِيبُهَا أَوْ امْرَأَةٍ يَنْكِحُهَا، فَهِجْرَتُهُ إِلَى مَا هَاجَرَ إِلَيْهِ.
+Narrated by Umar ibn Al-Khattab may Allah be pleased with him: I heard the Messenger of Allah ﷺ say.
+Actions are judged solely by intentions.
+And every person will have only what they intended.
+So whoever emigrated for Allah and His Messenger, his emigration is for Allah and His Messenger.
+And whoever emigrated for worldly benefit or to marry a woman, his emigration is for what he emigrated for.`;
+  updateCustomTextStatsBar();
+}
+
+function saveCustomTextFromModal(andMemorize = false) {
+  const title = (customTextTitleInput ? customTextTitleInput.value : '').trim() || 'Custom Text';
+  const category = (customTextCategoryInput ? customTextCategoryInput.value : '').trim() || 'General';
+  const rawText = (customTextContentInput ? customTextContentInput.value : '').trim();
+
+  if (!rawText) {
+    alert('Please enter some text for your custom entry.');
+    if (customTextContentInput) customTextContentInput.focus();
+    return;
+  }
+
+  const editId = customTextEditId ? customTextEditId.value : '';
+  let targetId = editId;
+
+  if (editId) {
+    const idx = customTextsStore.findIndex(c => c.id === editId);
+    if (idx !== -1) {
+      customTextsStore[idx].title = title;
+      customTextsStore[idx].category = category;
+      customTextsStore[idx].rawText = rawText;
+      customTextsStore[idx].updatedAt = new Date().toISOString();
+    }
+  } else {
+    targetId = 'custom_' + Date.now();
+    const newItem = {
+      id: targetId,
+      title: title,
+      category: category,
+      rawText: rawText,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    customTextsStore.unshift(newItem);
+  }
+
+  saveCustomTextsStore();
+  closeCustomTextModal();
+
+  if (customTextsCountBadge) {
+    customTextsCountBadge.textContent = customTextsStore.length;
+  }
+  if (activeLibraryTab === 'custom') {
+    renderCustomTextsLibrary();
+  }
+  renderSurahDropdown();
+
+  if (andMemorize) {
+    loadCustomText(targetId, true);
+  } else {
+    showToastNotification('Custom text saved to library');
+  }
+}
+
+function deleteCustomText(id) {
+  const item = customTextsStore.find(c => c.id === id);
+  const name = item ? item.title : 'this item';
+  if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+
+  customTextsStore = customTextsStore.filter(c => c.id !== id);
+  saveCustomTextsStore();
+
+  if (customTextsCountBadge) {
+    customTextsCountBadge.textContent = customTextsStore.length;
+  }
+  if (activeLibraryTab === 'custom') {
+    renderCustomTextsLibrary();
+  }
+  renderSurahDropdown();
+
+  // If the deleted text was active, revert to Surah 76
+  if (surahData && surahData.isCustom && surahData.customId === id) {
+    loadSurah(76);
+  }
+
+  showToastNotification('Custom text deleted');
+}
+
+function deleteCustomTextFromModal() {
+  const editId = customTextEditId ? customTextEditId.value : '';
+  if (editId) {
+    deleteCustomText(editId);
+    closeCustomTextModal();
+  }
+}
+
+function loadCustomText(id, autoMemorize = false) {
+  const customText = customTextsStore.find(c => c.id === id);
+  if (!customText) {
+    showToastNotification('Custom text not found');
+    return;
+  }
+
+  surahData = parseCustomTextToSurahData(customText);
+  currentSurahNumber = customText.id;
+  isVbvRenderedForCurrentSurah = false;
+  promptedGradeAyahs.clear();
+  revealedWordCount = 0;
+  currentMemorizeAyah = 1;
+  stopAutoReveal();
+  isAyahNumberAlwaysVisible = false;
+  if (memToggleAyahNumBtn) memToggleAyahNumBtn.classList.remove('active');
+  if (currentActiveSpan) {
+    currentActiveSpan.classList.remove('ayah-active-span');
+    currentActiveSpan = null;
+  }
+  if (audioPlayer && !audioPlayer.paused) {
+    audioPlayer.pause();
+  }
+  currentAudioIndex = 0;
+
+  rangeStart = 1;
+  rangeEnd = surahData.verses.length;
+  if (repeatFromVerse) repeatFromVerse.value = `${customText.id}:1`;
+  if (repeatToVerse) repeatToVerse.value = `${customText.id}:${surahData.verses.length}`;
+
+  updateBanner();
+  renderViews();
+
+  if (isLibraryView) {
+    hideLibraryView();
+  }
+
+  if (autoMemorize && !isMemorizeMode) {
+    toggleMemorizeMode();
+  }
+
+  if (isMemorizeMode && totalWordElements.length > 0) {
+    scrollWordIntoFocus(totalWordElements[0], false);
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+window.selectCustomText = function(id) {
+  if (surahDropdown) surahDropdown.classList.remove('show');
+  loadCustomText(id, false);
+};
+
+window.memorizeCustomTextDirect = function(id, e) {
+  if (e) e.stopPropagation();
+  loadCustomText(id, true);
+};
+
+window.switchLibraryTab = switchLibraryTab;
+window.renderCustomTextsLibrary = renderCustomTextsLibrary;
+window.openCustomTextModal = openCustomTextModal;
+window.closeCustomTextModal = closeCustomTextModal;
+window.insertSampleCustomText = insertSampleCustomText;
+window.saveCustomTextFromModal = saveCustomTextFromModal;
+window.deleteCustomText = deleteCustomText;
+window.deleteCustomTextFromModal = deleteCustomTextFromModal;
 
 // =========================================================
 // LOCAL STORAGE OFFLINE PERSISTENCE & FILE EXPORT
@@ -5447,18 +6283,39 @@ function renderGradingModal() {
   const verse = surahData.verses[currentGradingVerseIndex];
   const meta = surahData.meta;
 
-  if (gradingSurahBadge) gradingSurahBadge.textContent = `${meta.number}. ${meta.englishName}`;
-  if (gradingAyahTitle) gradingAyahTitle.textContent = `Ayah ${verse.verseNumber}`;
-  if (gradingAyahCounter) gradingAyahCounter.textContent = `${verse.verseNumber} / ${surahData.verses.length}`;
-
-  if (btnGradingPlayAudio) {
-    const isThisVersePlaying = (currentAudioIndex === currentGradingVerseIndex && !audioPlayer.paused);
-    btnGradingPlayAudio.textContent = isThisVersePlaying ? '❚❚' : '▶';
-    btnGradingPlayAudio.title = isThisVersePlaying ? 'Pause Ayah Audio' : 'Play Ayah Audio';
-    btnGradingPlayAudio.classList.toggle('playing', isThisVersePlaying);
+  if (gradingSurahBadge) {
+    gradingSurahBadge.textContent = (surahData && surahData.isCustom) 
+      ? (meta.englishName || 'Custom Text') 
+      : `${meta.number}. ${meta.englishName}`;
+  }
+  if (gradingAyahTitle) {
+    gradingAyahTitle.textContent = (surahData && surahData.isCustom) 
+      ? `Sentence ${verse.verseNumber}` 
+      : `Ayah ${verse.verseNumber}`;
+  }
+  if (gradingAyahCounter) {
+    gradingAyahCounter.textContent = `${verse.verseNumber} / ${surahData.verses.length}`;
   }
 
-  let arabicVerseText = verse.words.map(w => isHarakatVisible ? w.arabic : w.plain).join(' ');
+  if (btnGradingPlayAudio) {
+    if (!verse.audioUrl) {
+      btnGradingPlayAudio.style.display = 'none';
+    } else {
+      btnGradingPlayAudio.style.display = 'inline-flex';
+      const isThisVersePlaying = (currentAudioIndex === currentGradingVerseIndex && !audioPlayer.paused);
+      btnGradingPlayAudio.textContent = isThisVersePlaying ? '❚❚' : '▶';
+      btnGradingPlayAudio.title = isThisVersePlaying ? 'Pause Ayah Audio' : 'Play Ayah Audio';
+      btnGradingPlayAudio.classList.toggle('playing', isThisVersePlaying);
+    }
+  }
+
+  let arabicVerseText = verse.words.map(w => {
+    const disp = isHarakatVisible ? w.arabic : w.plain;
+    const lClass = (surahData && surahData.isCustom && typeof w.isArabic === 'boolean') 
+      ? (w.isArabic ? 'word-arabic' : 'word-latin') 
+      : '';
+    return `<span class="${lClass}">${disp}</span>`;
+  }).join(' ');
   if (gradingArabicVerse) gradingArabicVerse.innerHTML = `${arabicVerseText} ${getRosetteSvg(verse.verseNumber)}`;
   if (gradingVerseTrans) gradingVerseTrans.textContent = verse.translationEn || '';
 
@@ -6283,6 +7140,22 @@ function mergeAnkiRevlogs(remotePayload) {
     if (toggleFsrsNotifications) toggleFsrsNotifications.checked = remotePayload.fsrsNotifications;
   }
 
+  // 7. Custom Texts
+  if (Array.isArray(remotePayload.customTexts)) {
+    remotePayload.customTexts.forEach(incoming => {
+      const existingIdx = customTextsStore.findIndex(c => c.id === incoming.id);
+      if (existingIdx !== -1) {
+        if (new Date(incoming.updatedAt || 0) > new Date(customTextsStore[existingIdx].updatedAt || 0)) {
+          customTextsStore[existingIdx] = incoming;
+        }
+      } else {
+        customTextsStore.push(incoming);
+      }
+    });
+    saveCustomTextsStore();
+    if (activeLibraryTab === 'custom') renderCustomTextsLibrary();
+  }
+
   // Update UI components
   updateWordElementsMistakeClasses();
   updateActiveMistakeButtonState();
@@ -6310,6 +7183,7 @@ function generateSyncPayload() {
     notes: ayahNotesStore || {},
     wordVisOverrides: wordVisOverrides || {},
     ayahVisOverrides: ayahVisOverrides || {},
+    customTexts: customTextsStore || [],
     wordPopupTrigger: wordPopupTrigger || 'hover',
     fsrsNotifications: isFsrsNotificationsEnabled(),
     fontFamily: fontStyleSelect ? fontStyleSelect.value : 'KFGQPC-Hafs',
@@ -6476,6 +7350,21 @@ function importSyncData(inputData) {
       if (typeof data.fsrsNotifications === 'boolean') {
         setFsrsNotificationsEnabled(data.fsrsNotifications);
         if (toggleFsrsNotifications) toggleFsrsNotifications.checked = data.fsrsNotifications;
+      }
+      if (Array.isArray(data.customTexts)) {
+        data.customTexts.forEach(incoming => {
+          const existingIdx = customTextsStore.findIndex(c => c.id === incoming.id);
+          if (existingIdx !== -1) {
+            if (new Date(incoming.updatedAt || 0) > new Date(customTextsStore[existingIdx].updatedAt || 0)) {
+              customTextsStore[existingIdx] = incoming;
+            }
+          } else {
+            customTextsStore.push(incoming);
+          }
+        });
+        saveCustomTextsStore();
+        if (activeLibraryTab === 'custom') renderCustomTextsLibrary();
+        renderSurahDropdown();
       }
     }
 
@@ -7764,6 +8653,7 @@ if (initReciterSelect) {
   initReciterSelect.value = selectedReciter;
 }
 
+initCustomTexts();
 initChapters();
 initMistakeHistory();
 initAyahNotes();

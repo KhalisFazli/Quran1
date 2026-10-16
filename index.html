@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Lateef:wght@400;700&family=Noto+Naskh+Arabic:wght@400;600;700&family=Scheherazade+New:wght@400;700&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v1.0.0/dist/font-face.css" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=3.1" />
+  <link rel="stylesheet" href="style.css?v=3.3" />
   <!-- Google Identity Services for Google Drive AppData Sync -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -124,6 +124,22 @@
         <div class="lib-stats-summary" id="libStatsSummary"></div>
       </div>
 
+      <!-- Library Navigation Tabs (Quran Surahs vs Custom Texts) -->
+      <div class="lib-view-tabs" id="libViewTabs">
+        <button type="button" class="lib-tab-btn active" id="tabQuranSurahs" onclick="switchLibraryTab('quran')">
+          <span>📖 Quran Surahs</span>
+          <span class="lib-tab-count">114</span>
+        </button>
+        <button type="button" class="lib-tab-btn" id="tabCustomTexts" onclick="switchLibraryTab('custom')">
+          <span>📝 Custom Texts</span>
+          <span class="lib-tab-count" id="customTextsCountBadge">0</span>
+        </button>
+        <div style="flex:1;"></div>
+        <button type="button" class="lib-btn-new-custom" id="btnNewCustomText" onclick="openCustomTextModal()">
+          <span>➕ New Text</span>
+        </button>
+      </div>
+
       <div class="library-toolbar">
         <div class="lib-search-box">
           <span class="lib-search-icon">🔍</span>
@@ -143,18 +159,26 @@
       </div>
 
       <div class="library-surah-grid" id="librarySurahGrid"></div>
+      <div class="library-custom-grid" id="customTextsGrid" style="display:none;"></div>
     </section>
 
     <section class="surah-banner" id="surahBanner" style="display:none;">
-      <div class="banner-top">
-        <div class="arabic-title-calligraphy" id="bannerArabicCalligraphy">الإِنسَـٰن</div>
-        <div class="banner-title">
-          <h1 id="bannerTitle">76. Surah Al-Insaan</h1>
-          <div class="sub-name" id="bannerSubName">Man</div>
+      <button type="button" class="banner-collapse-btn" id="bannerCollapseBtn" title="Collapse Banner">▲</button>
+      <div class="banner-expanded-content" id="bannerExpandedContent">
+        <div class="banner-top" id="bannerTop">
+          <div class="arabic-title-calligraphy" id="bannerArabicCalligraphy">الإِنسَـٰن</div>
+          <div class="banner-title">
+            <h1 id="bannerTitle">76. Surah Al-Insaan</h1>
+            <div class="sub-name" id="bannerSubName">Man</div>
+          </div>
+        </div>
+        <div class="banner-controls" id="bannerControls">
+          <button class="banner-btn" id="btnListen" title="Listen / Pause">▶</button>
         </div>
       </div>
-      <div class="banner-controls">
-        <button class="banner-btn" id="btnListen" title="Listen / Pause">▶</button>
+      <div class="banner-collapsed-bar" id="bannerCollapsedBar" style="display:none;" title="Click to expand banner">
+        <span class="banner-mini-title" id="bannerMiniTitle">76. Surah Al-Insaan</span>
+        <span class="banner-mini-sub" id="bannerMiniSub">• Man</span>
       </div>
     </section>
 
@@ -360,7 +384,7 @@
   <div class="word-hover-tooltip" id="wordHoverTooltip">
     <button class="tooltip-dots-btn" id="wordTooltipDotsBtn" title="More word options">•••</button>
     <button class="tooltip-trans-btn" id="wordTooltipTransBtn">
-      <span id="wordTooltipTransText">[We] created</span>
+      <span id="wordTooltipTransText"></span>
       <span>›</span>
     </button>
 
@@ -628,6 +652,73 @@
     </div>
   </div>
 
+  <!-- Custom Text Editor Modal -->
+  <div class="custom-text-modal-overlay" id="customTextModal" style="display:none;">
+    <div class="custom-text-modal-card">
+      <div class="custom-text-modal-header">
+        <div class="custom-text-title-wrap">
+          <span class="custom-text-icon">📝</span>
+          <div>
+            <h3 id="customModalHeading">New Custom Text</h3>
+            <span class="custom-text-sub">Sentence ending with a dot (.) becomes an Ayah. Supports mixed Arabic & English.</span>
+          </div>
+        </div>
+        <button type="button" class="custom-text-close" id="btnCloseCustomTextModal" onclick="closeCustomTextModal()" title="Close">✕</button>
+      </div>
+
+      <div class="custom-text-modal-body">
+        <input type="hidden" id="customTextEditId" value="" />
+
+        <div class="custom-form-row">
+          <div class="custom-form-group flex-2">
+            <label for="customTextTitleInput">Title</label>
+            <input type="text" id="customTextTitleInput" placeholder="e.g. Hadith of Intentions, Al-Bayquniyyah, Dua..." maxlength="120" />
+          </div>
+          <div class="custom-form-group flex-1">
+            <label for="customTextCategoryInput">Category / Tag</label>
+            <input type="text" id="customTextCategoryInput" placeholder="e.g. Hadith, Dua, Poem, Grammar" list="customCategoryList" maxlength="40" />
+            <datalist id="customCategoryList">
+              <option value="Hadith">
+              <option value="Dua">
+              <option value="Poem">
+              <option value="Grammar">
+              <option value="Vocabulary">
+              <option value="Notes">
+              <option value="Quotes">
+            </datalist>
+          </div>
+        </div>
+
+        <div class="custom-form-group">
+          <div class="custom-textarea-header">
+            <label for="customTextContentInput">Text Content (Dot '.' divides sentences / ayahs)</label>
+            <button type="button" class="btn-insert-sample" id="btnInsertSampleText" onclick="insertSampleCustomText()">
+              ✨ Insert Sample Text
+            </button>
+          </div>
+          <textarea id="customTextContentInput" rows="9" placeholder="Enter or paste text here. Every sentence ending with a dot (.) will be treated as an Ayah with a dot button. Mixed Arabic and English words are fully supported!&#10;&#10;Example:&#10;إنما الأعمال بالنيات. Actions are but by intention. وإنما لكل امرئ ما نوى. And each person will have only what they intended."></textarea>
+          <div class="custom-text-stats-bar" id="customTextStatsBar">
+            <span id="customTextSentenceCount">0 sentences (ayahs)</span>
+            <span>•</span>
+            <span id="customTextWordCount">0 words</span>
+            <span>•</span>
+            <span id="customTextLangSummary">Mixed / Auto</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="custom-text-modal-footer">
+        <button type="button" class="btn-delete-custom-text" id="btnDeleteCustomTextModal" onclick="deleteCustomTextFromModal()" style="display:none;">
+          🗑️ Delete
+        </button>
+        <div style="flex:1;"></div>
+        <button type="button" class="btn-cancel-custom-modal" onclick="closeCustomTextModal()">Cancel</button>
+        <button type="button" class="btn-save-custom-lib" onclick="saveCustomTextFromModal(false)">💾 Save to Library</button>
+        <button type="button" class="btn-memorize-custom-modal" onclick="saveCustomTextFromModal(true)">🧠 Save & Memorize</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Word Detail Modal -->
   <div class="word-detail-overlay" id="wordDetailOverlay">
     <div class="word-detail-modal">
@@ -651,8 +742,8 @@
       <div class="word-info-banner">
         <button class="word-info-nav-arrow" id="wdPrevWordBtn" title="Previous Word">‹</button>
         <div class="word-info-content">
-          <div class="word-info-row"><b>Translation:</b> <span id="wdBannerTranslation">[We] created</span></div>
-          <div class="word-info-row"><b>Transliteration:</b> <span id="wdBannerTransliteration">khalaqnā</span></div>
+          <div class="word-info-row"><b>Translation:</b> <span id="wdBannerTranslation">—</span></div>
+          <div class="word-info-row"><b>Transliteration:</b> <span id="wdBannerTransliteration">—</span></div>
         </div>
         <button class="word-info-nav-arrow" id="wdNextWordBtn" title="Next Word">›</button>
       </div>
@@ -1375,6 +1466,6 @@
   <audio id="audioPlayer"></audio>
 
   <!-- External JavaScript Engine -->
-  <script src="app.js?v=3.2" defer></script>
+  <script src="app.js?v=3.3" defer></script>
 </body>
 </html>
