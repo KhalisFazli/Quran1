@@ -157,6 +157,10 @@ const ayahCtxMistakeHistory = document.getElementById('ayahCtxMistakeHistory');
 
 const surahSelectBtn = document.getElementById('surahSelectBtn');
 const surahDropdown = document.getElementById('surahDropdown');
+const tocPicker = document.getElementById('tocPicker');
+const tocSelectBtn = document.getElementById('tocSelectBtn');
+const tocDropdown = document.getElementById('tocDropdown');
+const headerTocTitle = document.getElementById('headerTocTitle');
 const headerSurahTitle = document.getElementById('headerSurahTitle');
 const pageMetaText = document.getElementById('pageMetaText');
 const readingView = document.getElementById('readingView');
@@ -1431,6 +1435,7 @@ function showLibraryView() {
   if (vbvView) vbvView.style.display = 'none';
   if (memorizeBar) memorizeBar.classList.remove('show');
   if (btnHomeLibrary) btnHomeLibrary.classList.add('active');
+  if (tocPicker) tocPicker.style.display = 'none';
   if (headerSurahTitle) headerSurahTitle.textContent = 'Memorize Quran';
   if (pageMetaText) {
     pageMetaText.textContent = activeLibraryTab === 'custom' 
@@ -1451,6 +1456,9 @@ function hideLibraryView() {
   const surahBanner = document.getElementById('surahBanner');
   if (surahBanner) surahBanner.style.display = 'flex';
   if (btnHomeLibrary) btnHomeLibrary.classList.remove('active');
+  if (tocPicker) {
+    tocPicker.style.display = (surahData && surahData.isCustom && surahData.toc && surahData.toc.length > 0) ? 'inline-flex' : 'none';
+  }
   if (surahData) {
     if (bismillahBlock) {
       bismillahBlock.style.display = (surahData.isCustom || surahData.meta.number === 9 || surahData.meta.number === 1) ? 'none' : 'block';
@@ -1627,9 +1635,10 @@ function getDueAyahsCountForSurah(surahNum) {
   if (!fsrsCardStore) return 0;
   const now = Date.now();
   let count = 0;
+  const sNumStr = String(surahNum);
   Object.keys(fsrsCardStore).forEach(k => {
     const parts = k.split(':');
-    if (parts.length === 2 && parseInt(parts[0]) === surahNum) {
+    if (parts.length === 2 && String(parts[0]) === sNumStr) {
       const card = fsrsCardStore[k];
       if (card && (card.state === 1 || card.state === 3 || (card.state === 2 && card.due && new Date(card.due).getTime() <= now))) {
         count++;
@@ -1642,9 +1651,10 @@ function getDueAyahsCountForSurah(surahNum) {
 function getSurahMasteryPercent(surahNum, totalAyahs) {
   if (!totalAyahs || !fsrsCardStore) return 0;
   let mature = 0;
+  const sNumStr = String(surahNum);
   Object.keys(fsrsCardStore).forEach(k => {
     const parts = k.split(':');
-    if (parts.length === 2 && parseInt(parts[0]) === surahNum) {
+    if (parts.length === 2 && String(parts[0]) === sNumStr) {
       const card = fsrsCardStore[k];
       if (card && card.state === 2 && (card.stability >= 21 || card.reps >= 2)) {
         mature++;
@@ -1657,14 +1667,15 @@ function getSurahMasteryPercent(surahNum, totalAyahs) {
 function getNewAyahsCountForSurah(surahNum, totalAyahs) {
   if (!totalAyahs) {
     const ch = chaptersList ? chaptersList.find(c => c.number === surahNum) : null;
-    totalAyahs = ch ? ch.numberOfAyahs : (surahData && surahData.meta && surahData.meta.number === surahNum ? surahData.verses.length : 0);
+    totalAyahs = ch ? ch.numberOfAyahs : (surahData && surahData.meta && String(surahData.meta.number) === String(surahNum) ? surahData.verses.length : 0);
   }
   if (!totalAyahs) return 0;
   let studiedCount = 0;
+  const sNumStr = String(surahNum);
   if (fsrsCardStore) {
     Object.keys(fsrsCardStore).forEach(k => {
       const parts = k.split(':');
-      if (parts.length === 2 && parseInt(parts[0]) === surahNum) {
+      if (parts.length === 2 && String(parts[0]) === sNumStr) {
         const card = fsrsCardStore[k];
         if (card && (card.state > 0 || (card.reps || 0) > 0)) {
           studiedCount++;
@@ -1784,13 +1795,18 @@ function renderSurahDropdown() {
     const customItemsHtml = customTextsStore.map(ct => {
       const isActive = surahData && surahData.isCustom && surahData.customId === ct.id;
       const sCount = countCustomSentences(ct.rawText);
+      const dueCount = getDueAyahsCountForSurah(ct.id);
+      const newCount = getNewAyahsCountForSurah(ct.id, sCount);
+      const masteryPercent = getSurahMasteryPercent(ct.id, sCount);
       return `
         <div class="dropdown-item ${isActive ? 'active' : ''}" onclick="selectCustomText('${ct.id}')">
           <div class="dropdown-item-left">
             <span class="dropdown-surah-name">📝 ${escapeHtml(ct.title)}</span>
-            <span class="dropdown-new-pill" style="background:#e0f2fe; color:#0369a1;">${escapeHtml(ct.category || 'Custom')}</span>
+            ${dueCount > 0 ? `<span class="dropdown-due-pill has-due">${dueCount} due</span>` : ''}
+            ${newCount > 0 ? `<span class="dropdown-new-pill has-new">${newCount} new</span>` : ''}
           </div>
           <div class="dropdown-item-right">
+            <span class="dropdown-mastery-tag ${masteryPercent === 0 ? 'zero' : ''}">${masteryPercent}%</span>
             <span class="dropdown-arabic-name" style="font-size:0.8rem;">${sCount} ayahs</span>
           </div>
         </div>
@@ -2082,12 +2098,20 @@ function updateBanner() {
     if (bannerMiniSub) bannerMiniSub.textContent = `• ${meta.numberOfAyahs} Sentences (${meta.englishNameTranslation || 'Custom'})`;
     if (bannerControls) bannerControls.style.display = 'none';
 
+    const hasToc = Boolean(surahData.toc && surahData.toc.length > 0);
+    if (tocPicker) {
+      tocPicker.style.display = (hasToc && !isLibraryView) ? 'inline-flex' : 'none';
+      if (hasToc) renderTocDropdown();
+    }
+
     const surahBanner = document.getElementById('surahBanner');
     if (surahBanner) {
       surahBanner.style.display = isLibraryView ? 'none' : 'flex';
     }
     return;
   }
+
+  if (tocPicker) tocPicker.style.display = 'none';
 
   if (!isLibraryView) {
     headerSurahTitle.textContent = `${meta.number}. ${meta.englishName}`;
@@ -2152,7 +2176,23 @@ function renderCustomReadingView() {
         </span> `;
     });
 
-    return `
+    let headingsHtml = '';
+    if (verse.headings && verse.headings.length > 0) {
+      headingsHtml = verse.headings.map((h, hIdx) => {
+        const isArHeading = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(h.title);
+        return `
+          <div class="custom-doc-heading custom-doc-h${h.level} ${isArHeading ? 'heading-ar' : 'heading-lt'}" 
+               id="doc-heading-${vIdx}-${hIdx}" 
+               data-heading-vidx="${vIdx}"
+               dir="${isArHeading ? 'rtl' : 'ltr'}">
+            <span class="heading-prefix">${'#'.repeat(h.level)}</span>
+            <span class="heading-text">${escapeHtml(h.title)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    return headingsHtml + `
       <div class="mushaf-verse-span reading-verse-span custom-verse-block ${isAr ? 'sentence-arabic' : 'sentence-latin'}" 
            id="reading-verse-span-${vIdx}" 
            data-verse-idx="${vIdx}" 
@@ -2383,6 +2423,22 @@ function renderVbvView() {
     const ayahKey = `${meta.number}:${verse.verseNumber}`;
     const hasNote = Boolean(ayahNotesStore && ayahNotesStore[ayahKey] && ayahNotesStore[ayahKey].trim());
     const noteText = hasNote ? ayahNotesStore[ayahKey] : '';
+
+    if (verse.headings && verse.headings.length > 0) {
+      verse.headings.forEach((h, hIdx) => {
+        const isArHeading = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(h.title);
+        html += `
+          <div class="custom-doc-heading custom-doc-h${h.level} ${isArHeading ? 'heading-ar' : 'heading-lt'}" 
+               id="vbv-heading-${idx}-${hIdx}" 
+               data-heading-vidx="${idx}"
+               dir="${isArHeading ? 'rtl' : 'ltr'}"
+               style="margin: 1.5rem 0 0.6rem 0; width: 100%;">
+            <span class="heading-prefix">${'#'.repeat(h.level)}</span>
+            <span class="heading-text">${escapeHtml(h.title)}</span>
+          </div>
+        `;
+      });
+    }
 
     html += `
       <div class="vbv-card" id="vbv-card-${idx}">
@@ -4991,13 +5047,25 @@ resetSettingsBtn.addEventListener('click', () => {
 
 surahSelectBtn.addEventListener('click', (e) => {
   e.stopPropagation();
+  if (tocDropdown) tocDropdown.classList.remove('show');
   surahDropdown.classList.toggle('show');
 });
+
+if (tocSelectBtn && tocDropdown) {
+  tocSelectBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (surahDropdown) surahDropdown.classList.remove('show');
+    tocDropdown.classList.toggle('show');
+  });
+}
 
 // Global outside-click dismisser
 document.addEventListener('click', (e) => {
   if (!surahSelectBtn.contains(e.target)) {
     surahDropdown.classList.remove('show');
+  }
+  if (tocSelectBtn && tocDropdown && !tocSelectBtn.contains(e.target) && !tocDropdown.contains(e.target)) {
+    tocDropdown.classList.remove('show');
   }
   if (!threeDotsPopup.contains(e.target) && e.target !== threeDotsBtn) {
     threeDotsPopup.classList.remove('show');
@@ -5153,8 +5221,8 @@ function splitLineIntoSentences(line) {
   return lineSegments;
 }
 
-function extractCustomSegments(rawText) {
-  if (!rawText) return [];
+function extractCustomSegmentsAndToc(rawText) {
+  if (!rawText) return { segments: [], toc: [] };
 
   // 1. Separate YAML frontmatter if present (Obsidian notes)
   const { text: bodyText } = parseObsidianFrontmatter(rawText);
@@ -5162,33 +5230,99 @@ function extractCustomSegments(rawText) {
   // 2. Normalize line breaks
   const normalized = bodyText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 3. Process line by line: each non-empty line is an ayah, and dots (.) within a line also divide ayahs
+  // 3. Process line by line: markdown headings become TOC items, non-empty text lines become ayahs
   const lines = normalized.split('\n');
-  const allSegments = [];
+  const rawSegments = [];
+  let pendingHeadings = [];
 
   lines.forEach(rawLine => {
+    const trimmed = rawLine.trim();
+    if (!trimmed) return;
+
+    // Check if this line is a markdown heading (e.g. # Title, ## Subtitle)
+    const headingMatch = trimmed.match(/^#{1,6}\s+(.+)$/);
+    if (headingMatch) {
+      const level = trimmed.match(/^(#{1,6})/)[1].length;
+      let title = headingMatch[1].replace(/\s*#+\s*$/, '').trim();
+      title = cleanMarkdownLine(title);
+      if (title) {
+        pendingHeadings.push({ level, title });
+      }
+      return;
+    }
+
     const cleanedLine = cleanMarkdownLine(rawLine);
     if (!cleanedLine) return;
 
     const subParts = splitLineIntoSentences(cleanedLine);
-    subParts.forEach(part => allSegments.push(part));
+    if (subParts.length > 0) {
+      subParts.forEach((part, pIdx) => {
+        let segHeadings = null;
+        if (pIdx === 0 && pendingHeadings.length > 0) {
+          segHeadings = [...pendingHeadings];
+          pendingHeadings = [];
+        }
+        rawSegments.push({ text: part, headings: segHeadings });
+      });
+    }
   });
+
+  // If there are trailing pending headings without following text, handle them
+  if (pendingHeadings.length > 0) {
+    if (rawSegments.length === 0) {
+      // The file consisted only of headings
+      pendingHeadings.forEach(h => {
+        rawSegments.push({ text: h.title, headings: [{ level: h.level, title: h.title }] });
+      });
+    } else {
+      const last = rawSegments[rawSegments.length - 1];
+      last.headings = (last.headings || []).concat(pendingHeadings);
+    }
+  }
 
   // 4. Global safety net: Merge any solitary number across lines into adjacent text
   const finalSegments = [];
-  for (let i = 0; i < allSegments.length; i++) {
-    const seg = allSegments[i];
-    const isOnlyNumber = /^[\s\d\u0660-\u0669\u06F0-\u06F9.۔()\-:]+$/.test(seg);
-    if (isOnlyNumber && i + 1 < allSegments.length) {
-      allSegments[i + 1] = seg + (seg.endsWith('.') ? ' ' : '. ') + allSegments[i + 1];
+  for (let i = 0; i < rawSegments.length; i++) {
+    const seg = rawSegments[i];
+    const isOnlyNumber = /^[\s\d\u0660-\u0669\u06F0-\u06F9.۔()\-:]+$/.test(seg.text);
+    if (isOnlyNumber && i + 1 < rawSegments.length) {
+      rawSegments[i + 1].text = seg.text + (seg.text.endsWith('.') ? ' ' : '. ') + rawSegments[i + 1].text;
+      if (seg.headings && seg.headings.length > 0) {
+        rawSegments[i + 1].headings = (seg.headings || []).concat(rawSegments[i + 1].headings || []);
+      }
     } else if (isOnlyNumber && finalSegments.length > 0) {
-      finalSegments[finalSegments.length - 1] += ' ' + seg;
+      finalSegments[finalSegments.length - 1].text += ' ' + seg.text;
+      if (seg.headings && seg.headings.length > 0) {
+        finalSegments[finalSegments.length - 1].headings = (finalSegments[finalSegments.length - 1].headings || []).concat(seg.headings);
+      }
     } else {
       finalSegments.push(seg);
     }
   }
 
-  return finalSegments;
+  // 5. Build TOC structure with exact target verse index and heading index
+  const toc = [];
+  finalSegments.forEach((seg, vIdx) => {
+    if (seg.headings && seg.headings.length > 0) {
+      seg.headings.forEach((h, hIdx) => {
+        toc.push({
+          id: toc.length,
+          level: h.level,
+          title: h.title,
+          targetVIdx: vIdx,
+          targetVerseNum: vIdx + 1,
+          hIdx: hIdx
+        });
+      });
+    }
+  });
+
+  return { segments: finalSegments, toc };
+}
+
+function extractCustomSegments(rawText) {
+  const { segments } = extractCustomSegmentsAndToc(rawText);
+  return segments.map(s => s.text);
 }
 
 function countCustomSentences(rawText) {
@@ -5198,10 +5332,11 @@ function countCustomSentences(rawText) {
 function parseCustomTextToSurahData(customText) {
   const text = customText.rawText || '';
   const { title: fmTitle, category: fmCategory } = parseObsidianFrontmatter(text);
-  const rawSegments = extractCustomSegments(text);
+  const { segments: rawSegments, toc } = extractCustomSegmentsAndToc(text);
 
   let globalWordCounter = 0;
-  const verses = rawSegments.map((sentence, idx) => {
+  const verses = rawSegments.map((seg, idx) => {
+    const sentence = seg.text || '';
     const vNum = idx + 1;
     const rawWords = sentence.split(/\s+/).filter(w => w.trim().length > 0);
     const wordList = rawWords.map((w, wIdx) => {
@@ -5227,6 +5362,7 @@ function parseCustomTextToSurahData(customText) {
       juzNumber: 1,
       hizbNumber: 1,
       words: wordList,
+      headings: seg.headings || null,
       startWordIdx: startIdx,
       endWordIdx: endIdx,
       translationEn: '',
@@ -5241,6 +5377,7 @@ function parseCustomTextToSurahData(customText) {
   return {
     isCustom: true,
     customId: customText.id,
+    toc: toc || [],
     meta: {
       number: customText.id,
       name: finalTitle,
@@ -5251,6 +5388,107 @@ function parseCustomTextToSurahData(customText) {
     verses: verses
   };
 }
+
+function renderTocDropdown() {
+  if (!tocDropdown) return;
+  if (!surahData || !surahData.isCustom || !surahData.toc || surahData.toc.length === 0) {
+    tocDropdown.innerHTML = '<div style="padding: 10px 12px; color: #8c7860; font-size: 0.82rem;">No markdown headings found</div>';
+    return;
+  }
+
+  const itemsHtml = surahData.toc.map((item) => {
+    const isAr = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(item.title);
+    return `
+      <div class="toc-item toc-item-level-${item.level}" 
+           data-vidx="${item.targetVIdx}" 
+           onclick="jumpToTocItem(${item.targetVIdx}, '${escapeHtml(item.title.replace(/'/g, "\\'"))}', ${item.hIdx || 0})">
+        <div class="toc-item-left" dir="${isAr ? 'rtl' : 'ltr'}">
+          <span class="toc-level-tag">H${item.level}</span>
+          <span class="toc-item-title" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
+        </div>
+        <span class="toc-item-badge">#${item.targetVerseNum}</span>
+      </div>
+    `;
+  }).join('');
+
+  tocDropdown.innerHTML = `
+    <div class="toc-dropdown-header">
+      <div style="display:flex; align-items:center; gap:6px;">
+        <span>📑 Table of Contents</span>
+        <span style="font-size:0.68rem; color:#8c7860; font-weight:600;">(${surahData.toc.length})</span>
+      </div>
+    </div>
+    <div class="toc-items-list">
+      ${itemsHtml}
+    </div>
+  `;
+}
+
+window.jumpToTocItem = function(targetVIdx, headingTitle, hIdx = 0) {
+  // 1. Close TOC dropdown
+  if (tocDropdown) tocDropdown.classList.remove('show');
+
+  // 2. Update TOC button title
+  if (headerTocTitle && headingTitle) {
+    headerTocTitle.textContent = headingTitle;
+    headerTocTitle.title = headingTitle;
+  }
+
+  // 3. Expand collapsed custom sections if target is inside
+  const secContentAr = document.getElementById('customSecContent_ar');
+  if (secContentAr && secContentAr.style.display === 'none') {
+    secContentAr.style.display = 'block';
+    const btnAr = document.getElementById('btnCustomSec_ar');
+    if (btnAr) btnAr.textContent = '▲';
+  }
+  const secContentEn = document.getElementById('customSecContent_en');
+  if (secContentEn && secContentEn.style.display === 'none') {
+    secContentEn.style.display = 'block';
+    const btnEn = document.getElementById('btnCustomSec_en');
+    if (btnEn) btnEn.textContent = '▲';
+  }
+  const secContentAll = document.getElementById('customSecContent_all');
+  if (secContentAll && secContentAll.style.display === 'none') {
+    secContentAll.style.display = 'block';
+    const btnAll = document.getElementById('btnCustomSec_all');
+    if (btnAll) btnAll.textContent = '▲';
+  }
+
+  // 4. In Memorize Mode, activate this ayah
+  const verseNum = targetVIdx + 1;
+  if (isMemorizeMode) {
+    currentMemorizeAyah = verseNum;
+    updateAyahMarkersVisibility();
+  }
+
+  // 5. Scroll to target element
+  let targetEl = null;
+  if (currentView === 'vbv') {
+    targetEl = document.getElementById(`vbv-heading-${targetVIdx}-${hIdx}`) || 
+               document.getElementById(`vbv-card-${targetVIdx}`) || 
+               document.getElementById(`vbv-verse-span-${targetVIdx}`);
+  } else {
+    targetEl = document.getElementById(`doc-heading-${targetVIdx}-${hIdx}`) || 
+               document.getElementById(`reading-verse-span-${targetVIdx}`);
+  }
+
+  if (targetEl) {
+    targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    targetEl.classList.add('word-highlight-pulse');
+    setTimeout(() => {
+      targetEl.classList.remove('word-highlight-pulse');
+    }, 2200);
+  }
+
+  // 6. Highlight active item in TOC dropdown
+  const tocItems = document.querySelectorAll('.toc-item');
+  tocItems.forEach(item => {
+    const vIdx = parseInt(item.getAttribute('data-vidx'));
+    item.classList.toggle('active', vIdx === targetVIdx);
+  });
+
+  showToastNotification(`📑 Jumped to: ${headingTitle}`);
+};
 
 function loadCustomTextsStore() {
   try {

@@ -44,6 +44,20 @@
         <span class="chevron-arrow">▾</span>
       </button>
       <div class="dropdown-menu" id="surahDropdown"></div>
+
+      <!-- Table of Contents (TOC) Dropdown for Custom Texts with Markdown Headings -->
+      <div class="toc-picker" id="tocPicker" style="display: none; position: relative;">
+        <button class="surah-select-btn toc-select-btn" id="tocSelectBtn" title="Table of Contents (Jump to section)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #b45309; flex-shrink: 0;">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="16" y2="12"></line>
+            <line x1="3" y1="18" x2="19" y2="18"></line>
+          </svg>
+          <span id="headerTocTitle" style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem;">TOC</span>
+          <span class="chevron-arrow">▾</span>
+        </button>
+        <div class="dropdown-menu toc-dropdown-menu" id="tocDropdown"></div>
+      </div>
     </div>
 
     <!-- Center Section: Page & Juz Meta + Due & New Ayah Counts -->
