@@ -6516,18 +6516,26 @@ body.memorize-active .floating-counter-pill {
 .mem-range-popover {
   display: none;
   position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-card, #ffffff);
-  border: 1px solid var(--border-line, #e2e8f0);
-  border-radius: 12px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  bottom: calc(100% + 12px);
+  right: -10px;
+  left: auto;
+  top: auto;
+  transform: none;
+  background: var(--bg-card, #faf4e6);
+  border: 1px solid var(--border-line, #dacbb0);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
   padding: 12px 14px;
-  width: 250px;
+  width: 260px;
+  max-width: calc(100vw - 24px);
   z-index: 1050;
   color: var(--text-main, #1e293b);
-  animation: popoverFadeIn 0.15s ease-out;
+  animation: popoverFadeInUp 0.16s ease-out;
+}
+
+@keyframes popoverFadeInUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .mem-range-popover.show {
@@ -6557,10 +6565,10 @@ body.memorize-active .floating-counter-pill {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.75);
   padding: 6px 8px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #dacbb0;
 }
 
 .mem-range-field {
@@ -6573,20 +6581,20 @@ body.memorize-active .floating-counter-pill {
 .mem-range-field label {
   font-size: 0.65rem;
   font-weight: 700;
-  color: #64748b;
+  color: #8c7860;
   text-transform: uppercase;
 }
 
 .mem-range-field input {
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #dacbb0;
   border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 700;
   text-align: center;
   background: #fff;
-  color: #0f172a;
+  color: #2b2e35;
   outline: none;
 }
 
@@ -6597,7 +6605,7 @@ body.memorize-active .floating-counter-pill {
 
 .mem-range-sep {
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: #a89a85;
   padding-top: 14px;
 }
 
@@ -6609,20 +6617,21 @@ body.memorize-active .floating-counter-pill {
 }
 
 .mem-range-preset-btn {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid #dacbb0;
+  border-radius: 6px;
   font-size: 0.68rem;
   font-weight: 600;
-  color: #475569;
+  color: #60513e;
   padding: 3px 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .mem-range-preset-btn:hover {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: #ffffff;
+  color: #1e293b;
+  border-color: #b45309;
 }
 
 .mem-range-footer {
