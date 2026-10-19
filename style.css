@@ -5944,5 +5944,113 @@ body.memorize-active .vbv-trans-hidden:hover {
   color: #0284c7;
 }
 
+/* ========================================================= */
+/* Game Controller & Bluetooth Remote Support Styles */
+/* ========================================================= */
+.controller-status-card {
+  background: #fff;
+  border: 1px solid var(--border-line, #e2d7c0);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.controller-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.controller-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-main, #2b2e35);
+  min-width: 0;
+}
+
+#controllerStatusText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+
+.controller-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #94a3b8;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+.controller-status-dot.connected {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  animation: ctrlPulse 2s infinite ease-in-out;
+}
+
+@keyframes ctrlPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.85; }
+}
+
+.controller-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #047857;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.controller-tester-box {
+  background: #fdfaf5;
+  border: 1px solid #ebdcc4;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+
+.tester-buttons-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.ctrl-btn-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 23px;
+  padding: 0 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 5px;
+  background: #fff;
+  border: 1px solid #e2d7c0;
+  color: #64748b;
+  transition: all 0.08s ease;
+  user-select: none;
+}
+
+.ctrl-btn-indicator.pressed {
+  background: #b45309;
+  border-color: #92400e;
+  color: #fff;
+  transform: scale(0.92);
+  box-shadow: 0 0 6px rgba(180, 83, 9, 0.45);
+}
+
 
 

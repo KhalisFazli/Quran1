@@ -1339,6 +1339,70 @@
         </button>
       </div>
 
+      <div class="settings-section-title">🎮 Controller & Bluetooth Remote</div>
+
+      <!-- Gamepad & Remote Controller Card -->
+      <div class="controller-status-card" id="controllerStatusCard">
+        <div class="controller-card-header">
+          <div class="controller-status-indicator">
+            <span class="controller-status-dot" id="controllerStatusDot"></span>
+            <span id="controllerStatusText">No Controller Detected</span>
+          </div>
+          <span class="controller-badge" id="controllerTypeBadge" style="display:none;">Active</span>
+        </div>
+        <p class="controller-status-hint" id="controllerStatusHint" style="font-size:0.75rem; color:#64748b; margin:6px 0 8px 0; line-height:1.4;">
+          Connect an Xbox, PlayStation, 8BitDo, Joy-Con, or Bluetooth remote and press any button to pair.
+        </p>
+
+        <!-- Live Button Tester -->
+        <div class="controller-tester-box" id="controllerTesterBox" style="display:none;">
+          <div style="font-size:0.72rem; color:#8c7860; font-weight:600; display:flex; justify-content:space-between;">
+            <span>Live Tester:</span>
+            <span>Pressed: <strong id="controllerLastButtonLabel" style="color:var(--text-accent, #b45309);">—</strong></span>
+          </div>
+          <div class="tester-buttons-grid">
+            <span class="ctrl-btn-indicator" id="ctrlInd_0" title="A / Cross">A</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_1" title="B / Circle">B</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_2" title="X / Square">X</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_3" title="Y / Triangle">Y</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_4" title="LB">LB</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_5" title="RB">RB</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_6" title="LT">LT</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_7" title="RT">RT</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_12" title="D-Pad Up">▲</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_13" title="D-Pad Down">▼</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_14" title="D-Pad Left">◄</span>
+            <span class="ctrl-btn-indicator" id="ctrlInd_15" title="D-Pad Right">►</span>
+          </div>
+        </div>
+
+        <!-- Haptic Vibration Feedback Toggle -->
+        <div class="setting-toggle-row" style="margin-top:8px; padding:4px 0 0 0;">
+          <span class="setting-toggle-label" style="font-size:0.82rem;">
+            <span>📳</span> Controller Vibration (Haptics)
+          </span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="toggleControllerVibration" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Quick Mapping Reference -->
+        <details class="controller-mapping-details" style="margin-top:8px;">
+          <summary style="font-size:0.76rem; font-weight:600; color:#8c7860; cursor:pointer;">📖 View Button Shortcuts</summary>
+          <div style="font-size:0.72rem; color:#475569; margin-top:6px; line-height:1.55; background:#fdfaf5; padding:8px 10px; border-radius:6px; border:1px solid #ebdcc4;">
+            <div>• <strong>A / RB / RT / D-Right / Space</strong>: Reveal next word</div>
+            <div>• <strong>B / LB / LT / D-Left</strong>: Unreveal previous word</div>
+            <div>• <strong>D-Pad Down</strong>: Switch to Next Ayah</div>
+            <div>• <strong>D-Pad Up</strong>: Switch to Previous Ayah</div>
+            <div>• <strong>X (Square)</strong>: Mark / Unmark mistake on word</div>
+            <div>• <strong>Y (Triangle) / Start</strong>: Play / Pause Ayah recitation</div>
+            <div>• <strong>1, 2, 3, 4 (X, B, A, Y)</strong>: Grade card in FSRS review modal</div>
+            <div>• <strong>Thumbstick (Analog)</strong>: Smooth vertical page scroll</div>
+          </div>
+        </details>
+      </div>
+
       <div class="settings-section-title">Google Drive Sync (Anki-Style Revlog)</div>
 
       <!-- Google Drive Cloud Sync Card -->

@@ -6311,16 +6311,23 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Arrow Down: switch to Next Ayah
-  if (e.key === 'ArrowDown') {
+  // Remote Clickers & Media buttons: Play / Pause
+  if (e.key === 'MediaPlayPause') {
+    e.preventDefault();
+    if (btnListen) btnListen.click();
+    return;
+  }
+
+  // Arrow Down / PageDown / MediaTrackNext / 'j': switch to Next Ayah
+  if (e.key === 'ArrowDown' || (!isMemorizeMode && (e.key === 'PageDown' || e.key === 'MediaTrackNext' || e.key.toLowerCase() === 'j'))) {
     e.preventDefault();
     const cur = getActiveMemorizeVerseNum();
     switchToAyah(cur + 1);
     return;
   }
 
-  // Arrow Up: switch to Previous Ayah
-  if (e.key === 'ArrowUp') {
+  // Arrow Up / PageUp / MediaTrackPrevious / 'k': switch to Previous Ayah
+  if (e.key === 'ArrowUp' || (!isMemorizeMode && (e.key === 'PageUp' || e.key === 'MediaTrackPrevious' || e.key.toLowerCase() === 'k'))) {
     e.preventDefault();
     const cur = getActiveMemorizeVerseNum();
     switchToAyah(cur - 1);
@@ -6328,13 +6335,13 @@ window.addEventListener('keydown', (e) => {
   }
 
   if (isMemorizeMode) {
-    // ArrowRight, Space: reveal next word in active ayah
-    if (e.key === 'ArrowRight' || e.key === ' ') {
+    // ArrowRight, Space, Enter, PageDown, MediaTrackNext: reveal next word in active ayah
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter' || e.key === 'PageDown' || e.key === 'MediaTrackNext' || e.key.toLowerCase() === 'j') {
       e.preventDefault();
       revealNextWord(false);
     }
-    // ArrowLeft, Backspace: unreveal previous word in active ayah
-    else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+    // ArrowLeft, Backspace, PageUp, MediaTrackPrevious: unreveal previous word in active ayah
+    else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp' || e.key === 'MediaTrackPrevious' || e.key.toLowerCase() === 'k') {
       e.preventDefault();
       unrevealPreviousWord(false);
     }
@@ -6384,6 +6391,316 @@ window.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// =========================================================
+// GAMEPAD & BLUETOOTH CONTROLLER ENGINE
+// =========================================================
+
+let connectedGamepads = {};
+let isControllerVibrationEnabled = true;
+let gamepadPollRaf = null;
+let lastButtonStates = {};
+
+const CONTROLLER_VIBRATION_STORAGE_KEY = 'quran_controller_vibration';
+
+function loadControllerSettings() {
+  const savedVibe = localStorage.getItem(CONTROLLER_VIBRATION_STORAGE_KEY);
+  if (savedVibe !== null) {
+    isControllerVibrationEnabled = savedVibe === 'true';
+  }
+  const toggleVibe = document.getElementById('toggleControllerVibration');
+  if (toggleVibe) {
+    toggleVibe.checked = isControllerVibrationEnabled;
+    toggleVibe.addEventListener('change', (e) => {
+      isControllerVibrationEnabled = e.target.checked;
+      localStorage.setItem(CONTROLLER_VIBRATION_STORAGE_KEY, String(isControllerVibrationEnabled));
+      if (isControllerVibrationEnabled) {
+        vibrateGamepad(70, 0.5, 0.2);
+      }
+    });
+  }
+}
+
+function vibrateGamepad(duration = 40, weak = 0.3, strong = 0.1) {
+  if (!isControllerVibrationEnabled) return;
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (let i = 0; i < gamepads.length; i++) {
+    const gp = gamepads[i];
+    if (gp && gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function') {
+      try {
+        gp.vibrationActuator.playEffect('dual-rumble', {
+          startDelay: 0,
+          duration: duration,
+          weakMagnitude: weak,
+          strongMagnitude: strong
+        }).catch(() => {});
+      } catch (e) {}
+    }
+  }
+}
+
+function updateControllerStatusUI() {
+  const statusDot = document.getElementById('controllerStatusDot');
+  const statusText = document.getElementById('controllerStatusText');
+  const typeBadge = document.getElementById('controllerTypeBadge');
+  const testerBox = document.getElementById('controllerTesterBox');
+  const hintText = document.getElementById('controllerStatusHint');
+
+  const gamepads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+  const hasConnected = gamepads.length > 0;
+
+  if (statusDot) statusDot.classList.toggle('connected', hasConnected);
+  if (typeBadge) typeBadge.style.display = hasConnected ? 'inline-block' : 'none';
+  if (testerBox) testerBox.style.display = hasConnected ? 'block' : 'none';
+
+  if (hasConnected) {
+    const firstGp = gamepads[0];
+    const cleanName = firstGp.id.replace(/\(.*\)/, '').trim() || 'Gamepad / Remote';
+    if (statusText) statusText.textContent = cleanName;
+    if (hintText) hintText.textContent = `${gamepads.length} controller(s) connected. Ready for review & navigation!`;
+  } else {
+    if (statusText) statusText.textContent = 'No Controller Detected';
+    if (hintText) hintText.textContent = 'Connect an Xbox, PlayStation, 8BitDo, Joy-Con, or Bluetooth remote and press any button to pair.';
+  }
+}
+
+function handleControllerButtonPress(buttonIndex, gamepad) {
+  // Update Live Button Tester in Settings
+  const ind = document.getElementById(`ctrlInd_${buttonIndex}`);
+  if (ind) {
+    ind.classList.add('pressed');
+    setTimeout(() => ind.classList.remove('pressed'), 180);
+  }
+  const lastBtnLabel = document.getElementById('controllerLastButtonLabel');
+  if (lastBtnLabel) {
+    const btnNames = {
+      0: 'A / Cross',
+      1: 'B / Circle',
+      2: 'X / Square',
+      3: 'Y / Triangle',
+      4: 'LB (L1)',
+      5: 'RB (R1)',
+      6: 'LT (L2)',
+      7: 'RT (R2)',
+      8: 'Back / Select',
+      9: 'Start / Menu',
+      10: 'L3 Click',
+      11: 'R3 Click',
+      12: 'D-Pad Up',
+      13: 'D-Pad Down',
+      14: 'D-Pad Left',
+      15: 'D-Pad Right'
+    };
+    lastBtnLabel.textContent = btnNames[buttonIndex] || `Button ${buttonIndex}`;
+  }
+
+  // 1. Ayah Grading Modal Shortcuts
+  const isGradingModalOpen = ayahGradingOverlay && ayahGradingOverlay.classList.contains('show');
+  if (isGradingModalOpen) {
+    if (buttonIndex === 2 || buttonIndex === 14) {
+      // X / Square / D-Left -> Again (1)
+      gradeCurrentAyah(1);
+      vibrateGamepad(70, 0.5, 0.3);
+      return;
+    }
+    if (buttonIndex === 1 || buttonIndex === 13) {
+      // B / Circle / D-Down -> Hard (2)
+      gradeCurrentAyah(2);
+      vibrateGamepad(40, 0.3, 0.1);
+      return;
+    }
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+      // A / Cross / RB / RT / D-Right -> Good (3)
+      gradeCurrentAyah(3);
+      vibrateGamepad(40, 0.4, 0.1);
+      return;
+    }
+    if (buttonIndex === 3 || buttonIndex === 12) {
+      // Y / Triangle / D-Up -> Easy (4)
+      gradeCurrentAyah(4);
+      vibrateGamepad(50, 0.5, 0.2);
+      return;
+    }
+    if (buttonIndex === 8 || buttonIndex === 4 || buttonIndex === 6) {
+      // Back / Select / LB / LT -> Dismiss
+      closeAyahGradingModal();
+      return;
+    }
+    return;
+  }
+
+  // 2. Navigation & Memorize Actions
+  if (isMemorizeMode) {
+    // Reveal next word: A (0), RB (5), RT (7), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+      revealNextWord(false);
+      vibrateGamepad(25, 0.2, 0);
+      return;
+    }
+
+    // Unreveal previous word: B (1), LB (4), LT (6), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+      unrevealPreviousWord(false);
+      vibrateGamepad(25, 0.15, 0);
+      return;
+    }
+
+    // Next Ayah: D-Down (13)
+    if (buttonIndex === 13) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur + 1);
+      vibrateGamepad(35, 0.25, 0);
+      return;
+    }
+
+    // Previous Ayah: D-Up (12)
+    if (buttonIndex === 12) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur - 1);
+      vibrateGamepad(35, 0.25, 0);
+      return;
+    }
+
+    // Mark/Unmark Mistake: X / Square (2)
+    if (buttonIndex === 2) {
+      if (revealedWordCount > 0 && totalWordElements[revealedWordCount - 1]) {
+        const activeEl = totalWordElements[revealedWordCount - 1];
+        const vNum = parseInt(activeEl.getAttribute('data-verse-num'));
+        const wIdx = parseInt(activeEl.getAttribute('data-word-idx'));
+        toggleWordMistake(currentSurahNumber, vNum, wIdx + 1);
+        vibrateGamepad(80, 0.6, 0.4);
+      }
+      return;
+    }
+
+    // Play/Pause Audio: Y / Triangle (3)
+    if (buttonIndex === 3) {
+      if (btnListen) btnListen.click();
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+
+    // Toggle Voice Recorder: Back / Select (8) or L3 (10)
+    if (buttonIndex === 8 || buttonIndex === 10) {
+      toggleVoiceRecorder();
+      vibrateGamepad(50, 0.3, 0.1);
+      return;
+    }
+
+    // Toggle Auto-Reveal: R3 (11)
+    if (buttonIndex === 11) {
+      if (memPlayRevealBtn) memPlayRevealBtn.click();
+      vibrateGamepad(40, 0.3, 0);
+      return;
+    }
+
+    // Toggle Memorize Mode: Start (9)
+    if (buttonIndex === 9) {
+      toggleMemorizeMode();
+      vibrateGamepad(40, 0.3, 0);
+      return;
+    }
+  } else {
+    // Normal Reading / VBV Mode
+    // Next Ayah: A (0), RB (5), RT (7), D-Down (13), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 13 || buttonIndex === 15) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur + 1);
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+
+    // Previous Ayah: B (1), LB (4), LT (6), D-Up (12), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 12 || buttonIndex === 14) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur - 1);
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+
+    // Play / Pause Audio: Y (3)
+    if (buttonIndex === 3) {
+      if (btnListen) btnListen.click();
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+
+    // Enter Memorize Mode: Start (9) or X (2)
+    if (buttonIndex === 9 || buttonIndex === 2) {
+      toggleMemorizeMode();
+      vibrateGamepad(50, 0.3, 0.1);
+      return;
+    }
+  }
+}
+
+function pollGamepads() {
+  const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+
+  for (let i = 0; i < gamepads.length; i++) {
+    const gp = gamepads[i];
+    if (!gp) continue;
+
+    if (!lastButtonStates[gp.index]) {
+      lastButtonStates[gp.index] = {};
+    }
+
+    // Check buttons
+    for (let b = 0; b < gp.buttons.length; b++) {
+      const btn = gp.buttons[b];
+      const isPressed = btn.pressed || btn.value > 0.5;
+      const wasPressed = !!lastButtonStates[gp.index][b];
+
+      if (isPressed && !wasPressed) {
+        handleControllerButtonPress(b, gp);
+      }
+      lastButtonStates[gp.index][b] = isPressed;
+    }
+
+    // Analog stick scrolling (Left Stick Y = axis 1, Right Stick Y = axis 3)
+    if (gp.axes && gp.axes.length > 1) {
+      const a1 = (Math.abs(gp.axes[1]) > 0.22) ? gp.axes[1] : 0;
+      const a3 = (gp.axes.length > 3 && Math.abs(gp.axes[3]) > 0.22) ? gp.axes[3] : 0;
+      const axisY = a1 || a3;
+      if (axisY !== 0) {
+        window.scrollBy({ top: axisY * 13, behavior: 'auto' });
+      }
+    }
+  }
+
+  gamepadPollRaf = requestAnimationFrame(pollGamepads);
+}
+
+function initGamepadSupport() {
+  loadControllerSettings();
+
+  window.addEventListener('gamepadconnected', (e) => {
+    connectedGamepads[e.gamepad.index] = e.gamepad;
+    updateControllerStatusUI();
+    showToastNotification(`🎮 Controller connected: ${e.gamepad.id.replace(/\(.*\)/, '').trim() || 'Gamepad'}`);
+    vibrateGamepad(70, 0.4, 0.2);
+    if (!gamepadPollRaf) {
+      gamepadPollRaf = requestAnimationFrame(pollGamepads);
+    }
+  });
+
+  window.addEventListener('gamepaddisconnected', (e) => {
+    delete connectedGamepads[e.gamepad.index];
+    delete lastButtonStates[e.gamepad.index];
+    updateControllerStatusUI();
+    showToastNotification('🎮 Controller disconnected');
+    const remaining = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+    if (remaining.length === 0 && gamepadPollRaf) {
+      cancelAnimationFrame(gamepadPollRaf);
+      gamepadPollRaf = null;
+    }
+  });
+
+  // Start polling in case gamepads are already connected
+  if (navigator.getGamepads && !gamepadPollRaf) {
+    gamepadPollRaf = requestAnimationFrame(pollGamepads);
+  }
+}
 
 // =========================================================
 // WORD FSRS SPACED REPETITION ENGINE (Free Spaced Repetition Scheduler)
@@ -9128,6 +9445,7 @@ initMistakeHistory();
 initAyahNotes();
 bootstrapRevlogFromExistingCards();
 initGdriveSync();
+initGamepadSupport();
 checkUrlHashSync();
 showLibraryView();
 loadSurah(76).then(() => {
