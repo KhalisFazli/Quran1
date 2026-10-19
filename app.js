@@ -2301,6 +2301,9 @@ function renderViews() {
   } else {
     renderVbvView();
   }
+  if (typeof applyAyahRangeState === 'function') {
+    applyAyahRangeState();
+  }
 }
 
 function renderReadingView() {
@@ -2606,6 +2609,16 @@ function getWordVisibilityState(wordEl) {
 }
 
 function applyWordMemorizeVisibility(wordEl, idx, revealedCount) {
+  // If Ayah Range is active, unselected ayahs are strictly hidden and cannot be revealed
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    const vNum = parseInt(wordEl.getAttribute('data-verse-num'), 10);
+    if (!isNaN(vNum) && (vNum < ayahRangeStart || vNum > ayahRangeEnd)) {
+      wordEl.classList.add('memorize-hidden');
+      wordEl.classList.remove('review-mastered-visible', 'persist-visible', 'mem-active-focus');
+      return;
+    }
+  }
+
   const override = getWordVisibilityState(wordEl);
   if (override === 'visible') {
     wordEl.classList.remove('memorize-hidden', 'review-mastered-visible');
@@ -2794,6 +2807,13 @@ function triggerGradeRevealForAyah(verseNum) {
 function revealWordAt(idx, isRapid = false) {
   const wordEl = totalWordElements[idx];
   if (!wordEl) return;
+
+  // Strict range check: if range mode is active, words outside range can NEVER be revealed
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    const vNum = parseInt(wordEl.getAttribute('data-verse-num'), 10);
+    if (!isNaN(vNum) && (vNum < ayahRangeStart || vNum > ayahRangeEnd)) return;
+  }
+
   const override = getWordVisibilityState(wordEl);
   if (override !== 'hidden') {
     wordEl.classList.remove('memorize-hidden');
@@ -2818,6 +2838,13 @@ function revealWordAt(idx, isRapid = false) {
 function hideWordAt(idx, isRapid = false) {
   const wordEl = totalWordElements[idx];
   if (!wordEl) return;
+
+  // Strict range check
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    const vNum = parseInt(wordEl.getAttribute('data-verse-num'), 10);
+    if (!isNaN(vNum) && (vNum < ayahRangeStart || vNum > ayahRangeEnd)) return;
+  }
+
   const override = getWordVisibilityState(wordEl);
   if (override !== 'visible') {
     wordEl.classList.add('memorize-hidden');
@@ -2851,7 +2878,19 @@ function hideWordAt(idx, isRapid = false) {
 function revealNextWord(isRapid = false) {
   if (!surahData || !surahData.verses || surahData.verses.length === 0) return;
 
-  const curAyahNum = getActiveMemorizeVerseNum();
+  let curAyahNum = getActiveMemorizeVerseNum();
+
+  // If Ayah Range is active, constrain to range boundaries
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    if (curAyahNum < ayahRangeStart) {
+      switchToAyah(ayahRangeStart);
+      curAyahNum = ayahRangeStart;
+    } else if (curAyahNum > ayahRangeEnd) {
+      switchToAyah(ayahRangeEnd);
+      curAyahNum = ayahRangeEnd;
+    }
+  }
+
   const curVerseIdx = Math.max(0, Math.min(surahData.verses.length - 1, curAyahNum - 1));
   const targetVerse = surahData.verses[curVerseIdx];
 
@@ -2871,8 +2910,9 @@ function revealNextWord(isRapid = false) {
     return;
   }
 
-  // 3. If all words in the active Ayah are already revealed, advance to next Ayah
-  if (curVerseIdx < surahData.verses.length - 1) {
+  // 3. If all words in the active Ayah are already revealed, advance to next Ayah (if within range)
+  const maxAllowedAyah = (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) ? ayahRangeEnd : surahData.verses.length;
+  if (curAyahNum < maxAllowedAyah && curVerseIdx < surahData.verses.length - 1) {
     const nextVerseNum = curAyahNum + 1;
     switchToAyah(nextVerseNum);
     const nextVerse = surahData.verses[curVerseIdx + 1];
@@ -2887,14 +2927,30 @@ function revealNextWord(isRapid = false) {
     }
   } else {
     stopAutoReveal();
-    showToastNotification('All Ayahs revealed in this Surah');
+    if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+      showToastNotification(`Reached end of selected range (Ayah ${ayahRangeEnd})`);
+    } else {
+      showToastNotification('All Ayahs revealed in this Surah');
+    }
   }
 }
 
 function unrevealPreviousWord(isRapid = false) {
   if (!surahData || !surahData.verses || surahData.verses.length === 0) return;
 
-  const curAyahNum = getActiveMemorizeVerseNum();
+  let curAyahNum = getActiveMemorizeVerseNum();
+
+  // If Ayah Range is active, constrain to range boundaries
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    if (curAyahNum < ayahRangeStart) {
+      switchToAyah(ayahRangeStart);
+      curAyahNum = ayahRangeStart;
+    } else if (curAyahNum > ayahRangeEnd) {
+      switchToAyah(ayahRangeEnd);
+      curAyahNum = ayahRangeEnd;
+    }
+  }
+
   const curVerseIdx = Math.max(0, Math.min(surahData.verses.length - 1, curAyahNum - 1));
   const targetVerse = surahData.verses[curVerseIdx];
 
@@ -2914,8 +2970,9 @@ function unrevealPreviousWord(isRapid = false) {
     return;
   }
 
-  // 3. If all words in the active Ayah are already hidden, switch to previous Ayah
-  if (curVerseIdx > 0) {
+  // 3. If all words in the active Ayah are already hidden, switch to previous Ayah (if within range)
+  const minAllowedAyah = (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) ? ayahRangeStart : 1;
+  if (curAyahNum > minAllowedAyah && curVerseIdx > 0) {
     const prevVerseNum = curAyahNum - 1;
     switchToAyah(prevVerseNum);
     const prevVerse = surahData.verses[curVerseIdx - 1];
@@ -2929,7 +2986,11 @@ function unrevealPreviousWord(isRapid = false) {
       }
     }
   } else {
-    showToastNotification('Already at start of Ayah 1');
+    if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+      showToastNotification(`Reached start of selected range (Ayah ${ayahRangeStart})`);
+    } else {
+      showToastNotification('Already at start of Ayah 1');
+    }
   }
 }
 
@@ -2987,8 +3048,53 @@ if (memActionsGroup) {
   memActionsGroup.addEventListener('click', e => e.stopPropagation());
 }
 
-memToggleRevealAllBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
+function toggleRevealAll() {
+  if (!surahData || !surahData.verses) return;
+
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    // Range mode: ONLY affect the selected ayahs!
+    const startIdx = Math.max(1, ayahRangeStart);
+    const endIdx = Math.min(surahData.verses.length, ayahRangeEnd);
+
+    let rangeWordElements = [];
+    for (let v = startIdx; v <= endIdx; v++) {
+      const verse = surahData.verses[v - 1];
+      if (verse) {
+        for (let i = verse.startWordIdx; i <= verse.endWordIdx; i++) {
+          if (totalWordElements[i]) rangeWordElements.push(totalWordElements[i]);
+        }
+      }
+    }
+
+    if (rangeWordElements.length === 0) return;
+
+    const allRangeRevealed = rangeWordElements.every(el => !el.classList.contains('memorize-hidden'));
+
+    if (allRangeRevealed) {
+      rangeWordElements.forEach(el => el.classList.add('memorize-hidden'));
+      showToastNotification(`Hidden Ayahs ${startIdx}-${endIdx}`);
+    } else {
+      rangeWordElements.forEach(el => el.classList.remove('memorize-hidden'));
+      showToastNotification(`Revealed Ayahs ${startIdx}-${endIdx}`);
+    }
+
+    // Unselected ayahs stay strictly hidden
+    for (let v = 1; v <= surahData.verses.length; v++) {
+      if (v < startIdx || v > endIdx) {
+        const verse = surahData.verses[v - 1];
+        if (verse) {
+          for (let i = verse.startWordIdx; i <= verse.endWordIdx; i++) {
+            if (totalWordElements[i]) totalWordElements[i].classList.add('memorize-hidden');
+          }
+        }
+      }
+    }
+
+    updateAyahMarkersVisibility();
+    return;
+  }
+
+  // Full Surah Reveal / Hide All
   if (revealedWordCount >= totalWordElements.length) {
     setRevealedWordCount(0);
     if (totalWordElements.length > 0) scrollWordIntoFocus(totalWordElements[0], false);
@@ -2996,6 +3102,11 @@ memToggleRevealAllBtn.addEventListener('click', (e) => {
     setRevealedWordCount(totalWordElements.length);
     if (totalWordElements.length > 0) scrollWordIntoFocus(totalWordElements[totalWordElements.length - 1], false);
   }
+}
+
+memToggleRevealAllBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleRevealAll();
 });
 
 function toggleAutoReveal() {
@@ -3571,6 +3682,19 @@ function closeAudioBar() {
 window.switchToAyah = function(targetAyah, autoPlayIfPlaying = false) {
   if (!surahData || !surahData.verses || !surahData.verses.length) return;
   const totalVerses = surahData.verses.length;
+
+  // Ayah Range Mode constraint
+  if (typeof isAyahRangeActive !== 'undefined' && isAyahRangeActive) {
+    if (targetAyah < ayahRangeStart) {
+      showToastNotification(`At start of selected range (Ayah ${ayahRangeStart})`);
+      return;
+    }
+    if (targetAyah > ayahRangeEnd) {
+      showToastNotification(`At end of selected range (Ayah ${ayahRangeEnd})`);
+      return;
+    }
+  }
+
   if (targetAyah < 1) {
     showToastNotification('Already at Ayah 1');
     return;
@@ -6318,6 +6442,56 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Escape closes any open HUD or Range Popover
+  if (e.key === 'Escape') {
+    const wHud = document.getElementById('wordMeaningHud');
+    const aHud = document.getElementById('ayahMeaningHud');
+    const rPop = document.getElementById('memRangePopover');
+    if (wHud && wHud.style.display !== 'none') {
+      e.preventDefault();
+      wHud.style.display = 'none';
+      return;
+    }
+    if (aHud && aHud.style.display !== 'none') {
+      e.preventDefault();
+      aHud.style.display = 'none';
+      return;
+    }
+    if (rPop && rPop.classList.contains('show')) {
+      e.preventDefault();
+      rPop.classList.remove('show');
+      return;
+    }
+  }
+
+  // Word Meaning Hotkey: 'w'
+  if (e.key.toLowerCase() === 'w') {
+    e.preventDefault();
+    if (typeof toggleActiveWordMeaningHud === 'function') toggleActiveWordMeaningHud();
+    return;
+  }
+
+  // Ayah Meaning Hotkey: 'a'
+  if (e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    if (typeof toggleActiveAyahMeaningHud === 'function') toggleActiveAyahMeaningHud();
+    return;
+  }
+
+  // Play Word Audio Hotkey: 'q'
+  if (e.key.toLowerCase() === 'q') {
+    e.preventDefault();
+    if (typeof playActiveWordAudio === 'function') playActiveWordAudio();
+    return;
+  }
+
+  // Play / Pause Ayah Audio Hotkey: 'y'
+  if (e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    if (typeof playActiveAyahAudio === 'function') playActiveAyahAudio();
+    return;
+  }
+
   // Floating Counter Toggle Hotkey: 'c' or 't'
   if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 't') {
     e.preventDefault();
@@ -6570,14 +6744,14 @@ function handleControllerButtonPress(buttonIndex, gamepad) {
   // 2. Floating Counter Controls (Active when window is open or minimized pill is active)
   const isCounterOpen = (typeof isFloatingCounterActive === 'function') && isFloatingCounterActive();
   if (isCounterOpen) {
-    // Increment (+1): A (0), RB (5), RT (7), D-Right (15)
-    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+    // Increment (+1): A (0), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 15) {
       incrementFloatingCounter(false);
       vibrateGamepad(25, 0.25, 0);
       return;
     }
-    // Decrement (-1): B (1), LB (4), LT (6), D-Left (14)
-    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+    // Decrement (-1): B (1), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 14) {
       decrementFloatingCounter(false);
       vibrateGamepad(20, 0.2, 0);
       return;
@@ -6600,131 +6774,145 @@ function handleControllerButtonPress(buttonIndex, gamepad) {
       vibrateGamepad(40, 0.3, 0);
       return;
     }
-  } else {
-    // When Counter is Closed: L3 (10) or Back (8, in reader mode) opens counter
-    if (buttonIndex === 10 || (!isMemorizeMode && buttonIndex === 8)) {
-      toggleFloatingCounter();
-      vibrateGamepad(50, 0.3, 0.1);
+    // Allow Word/Ayah Meaning & Audio actions while Counter is open:
+    if (buttonIndex === 4) {
+      toggleActiveWordMeaningHud();
+      return;
+    }
+    if (buttonIndex === 5) {
+      toggleActiveAyahMeaningHud();
+      return;
+    }
+    if (buttonIndex === 6) {
+      playActiveWordAudio();
+      return;
+    }
+    if (buttonIndex === 7) {
+      toggleRevealAll();
+      vibrateGamepad(40, 0.3, 0);
       return;
     }
   }
 
-  // 3. Navigation & Memorize Actions
-  if (isMemorizeMode) {
-    // Reveal next word: A (0), RB (5), RT (7), D-Right (15)
-    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+  // 3. Dedicated Controller Action Mappings (All Modes)
+  // Show Word Meaning: LB (4)
+  if (buttonIndex === 4) {
+    toggleActiveWordMeaningHud();
+    return;
+  }
+
+  // Show Ayah Meaning: RB (5)
+  if (buttonIndex === 5) {
+    toggleActiveAyahMeaningHud();
+    return;
+  }
+
+  // Play Word Audio: LT (6)
+  if (buttonIndex === 6) {
+    playActiveWordAudio();
+    return;
+  }
+
+  // Reveal and Hide All: RT (7)
+  if (buttonIndex === 7) {
+    toggleRevealAll();
+    vibrateGamepad(40, 0.3, 0);
+    return;
+  }
+
+  // Mark / Unmark Mistake: X / Square (2)
+  if (buttonIndex === 2) {
+    toggleActiveWordMistake();
+    return;
+  }
+
+  // Play / Pause Ayah Recitation: Y / Triangle (3)
+  if (buttonIndex === 3) {
+    playActiveAyahAudio();
+    return;
+  }
+
+  // Repetition Control (Floating Tasbih Counter): L3 Click (10)
+  if (buttonIndex === 10) {
+    toggleFloatingCounter();
+    vibrateGamepad(50, 0.3, 0.1);
+    return;
+  }
+
+  // Grade Mode Toggle: R3 Click (11)
+  if (buttonIndex === 11) {
+    if (memToggleGradeBtn) memToggleGradeBtn.click();
+    vibrateGamepad(40, 0.3, 0);
+    return;
+  }
+
+  // Toggle Ayah Range Mode Popover: Back / Select (8)
+  if (buttonIndex === 8) {
+    toggleAyahRangePopover();
+    return;
+  }
+
+  // Toggle Memorize Mode: Start (9)
+  if (buttonIndex === 9) {
+    toggleMemorizeMode();
+    vibrateGamepad(40, 0.3, 0);
+    return;
+  }
+
+  // Next Ayah: D-Down (13)
+  if (buttonIndex === 13) {
+    const cur = getActiveMemorizeVerseNum();
+    switchToAyah(cur + 1);
+    vibrateGamepad(35, 0.25, 0);
+    return;
+  }
+
+  // Previous Ayah: D-Up (12)
+  if (buttonIndex === 12) {
+    const cur = getActiveMemorizeVerseNum();
+    switchToAyah(cur - 1);
+    vibrateGamepad(35, 0.25, 0);
+    return;
+  }
+
+  // Reveal Next Word: A (0) or D-Right (15)
+  if (buttonIndex === 0 || buttonIndex === 15) {
+    if (isMemorizeMode) {
       revealNextWord(false);
       vibrateGamepad(25, 0.2, 0);
-      return;
+    } else {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur + 1);
+      vibrateGamepad(30, 0.2, 0);
     }
+    return;
+  }
 
-    // Unreveal previous word: B (1), LB (4), LT (6), D-Left (14)
-    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+  // Unreveal Previous Word: B (1) or D-Left (14)
+  if (buttonIndex === 1 || buttonIndex === 14) {
+    if (isMemorizeMode) {
       unrevealPreviousWord(false);
       vibrateGamepad(25, 0.15, 0);
-      return;
-    }
-
-    // Next Ayah: D-Down (13)
-    if (buttonIndex === 13) {
-      const cur = getActiveMemorizeVerseNum();
-      switchToAyah(cur + 1);
-      vibrateGamepad(35, 0.25, 0);
-      return;
-    }
-
-    // Previous Ayah: D-Up (12)
-    if (buttonIndex === 12) {
-      const cur = getActiveMemorizeVerseNum();
-      switchToAyah(cur - 1);
-      vibrateGamepad(35, 0.25, 0);
-      return;
-    }
-
-    // Mark/Unmark Mistake: X / Square (2)
-    if (buttonIndex === 2) {
-      if (revealedWordCount > 0 && totalWordElements[revealedWordCount - 1]) {
-        const activeEl = totalWordElements[revealedWordCount - 1];
-        const vNum = parseInt(activeEl.getAttribute('data-verse-num'));
-        const wIdx = parseInt(activeEl.getAttribute('data-word-idx'));
-        toggleWordMistake(currentSurahNumber, vNum, wIdx + 1);
-        vibrateGamepad(80, 0.6, 0.4);
-      }
-      return;
-    }
-
-    // Play/Pause Audio: Y / Triangle (3)
-    if (buttonIndex === 3) {
-      if (btnListen) btnListen.click();
-      vibrateGamepad(30, 0.2, 0);
-      return;
-    }
-
-    // Toggle Voice Recorder: Back / Select (8)
-    if (buttonIndex === 8) {
-      toggleVoiceRecorder();
-      vibrateGamepad(50, 0.3, 0.1);
-      return;
-    }
-
-    // Toggle Auto-Reveal: R3 (11)
-    if (buttonIndex === 11) {
-      if (memPlayRevealBtn) memPlayRevealBtn.click();
-      vibrateGamepad(40, 0.3, 0);
-      return;
-    }
-
-    // Toggle Memorize Mode: Start (9)
-    if (buttonIndex === 9) {
-      toggleMemorizeMode();
-      vibrateGamepad(40, 0.3, 0);
-      return;
-    }
-  } else {
-    // Normal Reading / VBV Mode
-    // Next Ayah: A (0), RB (5), RT (7), D-Down (13), D-Right (15)
-    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 13 || buttonIndex === 15) {
-      const cur = getActiveMemorizeVerseNum();
-      switchToAyah(cur + 1);
-      vibrateGamepad(30, 0.2, 0);
-      return;
-    }
-
-    // Previous Ayah: B (1), LB (4), LT (6), D-Up (12), D-Left (14)
-    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 12 || buttonIndex === 14) {
+    } else {
       const cur = getActiveMemorizeVerseNum();
       switchToAyah(cur - 1);
       vibrateGamepad(30, 0.2, 0);
-      return;
     }
-
-    // Play / Pause Audio: Y (3)
-    if (buttonIndex === 3) {
-      if (btnListen) btnListen.click();
-      vibrateGamepad(30, 0.2, 0);
-      return;
-    }
-
-    // Enter Memorize Mode: Start (9) or X (2)
-    if (buttonIndex === 9 || buttonIndex === 2) {
-      toggleMemorizeMode();
-      vibrateGamepad(50, 0.3, 0.1);
-      return;
-    }
+    return;
   }
 }
 
 function handleControllerButtonHold(buttonIndex, gamepad) {
   const isCounterOpen = (typeof isFloatingCounterActive === 'function') && isFloatingCounterActive();
   if (isCounterOpen) {
-    // Increment: A (0), RB (5), RT (7), D-Right (15)
-    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+    // Increment: A (0), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 15) {
       incrementFloatingCounter(true);
       vibrateGamepad(15, 0.15, 0);
       return;
     }
-    // Decrement: B (1), LB (4), LT (6), D-Left (14)
-    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+    // Decrement: B (1), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 14) {
       decrementFloatingCounter(true);
       vibrateGamepad(15, 0.1, 0);
       return;
@@ -6733,15 +6921,15 @@ function handleControllerButtonHold(buttonIndex, gamepad) {
   }
 
   if (isMemorizeMode) {
-    // Rapid word reveal on hold: A (0), RB (5), RT (7), D-Right (15)
-    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+    // Rapid word reveal on hold: A (0), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 15) {
       revealNextWord(true);
       vibrateGamepad(15, 0.15, 0);
       return;
     }
 
-    // Rapid word unreveal on hold: B (1), LB (4), LT (6), D-Left (14)
-    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+    // Rapid word unreveal on hold: B (1), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 14) {
       unrevealPreviousWord(true);
       vibrateGamepad(15, 0.1, 0);
       return;
@@ -6764,7 +6952,7 @@ function handleControllerButtonHold(buttonIndex, gamepad) {
     }
   } else {
     // Normal Reading / VBV Mode on hold: Next Ayah
-    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 13 || buttonIndex === 15) {
+    if (buttonIndex === 0 || buttonIndex === 13 || buttonIndex === 15) {
       const cur = getActiveMemorizeVerseNum();
       switchToAyah(cur + 1);
       vibrateGamepad(30, 0.2, 0);
@@ -6772,7 +6960,7 @@ function handleControllerButtonHold(buttonIndex, gamepad) {
     }
 
     // Normal Reading / VBV Mode on hold: Previous Ayah
-    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 12 || buttonIndex === 14) {
+    if (buttonIndex === 1 || buttonIndex === 12 || buttonIndex === 14) {
       const cur = getActiveMemorizeVerseNum();
       switchToAyah(cur - 1);
       vibrateGamepad(30, 0.2, 0);
@@ -7346,6 +7534,356 @@ function initFloatingCounter() {
   }
 
   updateCounterDisplay();
+}
+
+// =========================================================
+// WORD MEANING, AYAH MEANING & AUDIO HUD CONTROLLER ENGINE
+// =========================================================
+
+let wordAudioPlayer = new Audio();
+
+function getActiveWordElement() {
+  if (isMemorizeMode) {
+    if (revealedWordCount > 0 && totalWordElements[revealedWordCount - 1]) {
+      return totalWordElements[revealedWordCount - 1];
+    }
+    const curAyah = getActiveMemorizeVerseNum();
+    const curVerse = (surahData && surahData.verses) ? surahData.verses[curAyah - 1] : null;
+    if (curVerse && totalWordElements[curVerse.startWordIdx]) {
+      return totalWordElements[curVerse.startWordIdx];
+    }
+  } else {
+    if (typeof activeHoveredWordEl !== 'undefined' && activeHoveredWordEl) return activeHoveredWordEl;
+    const curAyah = getActiveMemorizeVerseNum();
+    const curVerse = (surahData && surahData.verses) ? surahData.verses[curAyah - 1] : null;
+    if (curVerse && totalWordElements[curVerse.startWordIdx]) {
+      return totalWordElements[curVerse.startWordIdx];
+    }
+  }
+  return totalWordElements[0] || null;
+}
+
+function getActiveWordData() {
+  const el = getActiveWordElement();
+  if (!el) return null;
+  const vNum = parseInt(el.getAttribute('data-verse-num'), 10);
+  const wIdx = parseInt(el.getAttribute('data-word-idx'), 10);
+  const vIdx = vNum - 1;
+  if (!surahData || !surahData.verses || !surahData.verses[vIdx]) return null;
+  const verse = surahData.verses[vIdx];
+  const word = verse.words ? verse.words[wIdx] : null;
+  return { el, vNum, wIdx, vIdx, verse, word };
+}
+
+function toggleActiveWordMeaningHud() {
+  const hud = document.getElementById('wordMeaningHud');
+  if (!hud) return;
+
+  if (hud.style.display !== 'none') {
+    hud.style.display = 'none';
+    return;
+  }
+
+  const data = getActiveWordData();
+  if (!data) {
+    showToastNotification('No active word selected');
+    return;
+  }
+
+  const wmhRef = document.getElementById('wmhRef');
+  const wmhArabic = document.getElementById('wmhArabic');
+  const wmhTranslit = document.getElementById('wmhTranslit');
+  const wmhMeaning = document.getElementById('wmhMeaning');
+
+  if (wmhRef) wmhRef.textContent = `${currentSurahNumber}:${data.vNum} • Word ${data.wIdx + 1}`;
+  if (wmhArabic) wmhArabic.textContent = data.word ? data.word.arabic : (data.el.textContent || '');
+  if (wmhTranslit) wmhTranslit.textContent = data.word && data.word.transliteration ? data.word.transliteration : '';
+  if (wmhMeaning) wmhMeaning.textContent = (data.word && data.word.translation) ? data.word.translation : (data.el.getAttribute('data-trans') || 'Meaning not available');
+
+  hud.style.display = 'block';
+  vibrateGamepad(30, 0.2, 0);
+
+  // Briefly pulse focus highlight on the active word
+  data.el.classList.add('mem-active-focus');
+}
+
+function toggleActiveAyahMeaningHud() {
+  const hud = document.getElementById('ayahMeaningHud');
+  if (!hud) return;
+
+  if (hud.style.display !== 'none') {
+    hud.style.display = 'none';
+    return;
+  }
+
+  const curAyah = getActiveMemorizeVerseNum();
+  if (!surahData || !surahData.verses || !surahData.verses[curAyah - 1]) {
+    showToastNotification('No active Ayah selected');
+    return;
+  }
+
+  const verse = surahData.verses[curAyah - 1];
+  const amhRef = document.getElementById('amhRef');
+  const amhTransEn = document.getElementById('amhTransEn');
+  const amhTransId = document.getElementById('amhTransId');
+  const sName = (surahData && surahData.meta) ? surahData.meta.englishName : `Surah ${currentSurahNumber}`;
+
+  if (amhRef) amhRef.textContent = `${sName} • Ayah ${curAyah}`;
+  if (amhTransEn) amhTransEn.textContent = verse.translationEn || 'English translation not available';
+  if (amhTransId) amhTransId.textContent = verse.translationId || 'Indonesian translation not available';
+
+  hud.style.display = 'block';
+  vibrateGamepad(30, 0.2, 0);
+}
+
+function playActiveWordAudio() {
+  const data = getActiveWordData();
+  if (!data) return;
+
+  if (data.word && data.word.audioUrl) {
+    wordAudioPlayer.src = data.word.audioUrl;
+    wordAudioPlayer.play().then(() => {
+      showToastNotification(`🔊 Word audio: ${data.word.arabic}`);
+      vibrateGamepad(25, 0.2, 0);
+    }).catch(e => {
+      console.warn('Word audio playback:', e);
+    });
+  } else if (data.verse && data.verse.audioUrl) {
+    audioPlayer.src = data.verse.audioUrl;
+    safePlay(audioPlayer);
+    showToastNotification(`🔊 Playing Ayah ${data.vNum} audio`);
+    vibrateGamepad(25, 0.2, 0);
+  } else {
+    showToastNotification('No audio available for this word');
+  }
+}
+
+function playActiveAyahAudio() {
+  if (audioPlayer && !audioPlayer.paused) {
+    audioPlayer.pause();
+    showToastNotification('⏸ Ayah audio paused');
+    vibrateGamepad(30, 0.2, 0);
+    if (mainPlayPauseBtn) mainPlayPauseBtn.textContent = '▶';
+    if (btnListen) btnListen.textContent = '▶';
+  } else {
+    const curAyah = getActiveMemorizeVerseNum();
+    playAyah(curAyah - 1);
+    showToastNotification(`▶ Playing Ayah ${curAyah}`);
+    vibrateGamepad(30, 0.25, 0);
+    if (mainPlayPauseBtn) mainPlayPauseBtn.textContent = '❚❚';
+    if (btnListen) btnListen.textContent = '❚❚';
+  }
+}
+
+function toggleActiveWordMistake() {
+  const data = getActiveWordData();
+  if (!data) return;
+  toggleWordMistake(currentSurahNumber, data.vNum, data.wIdx + 1);
+  vibrateGamepad(80, 0.6, 0.4);
+}
+
+// =========================================================
+// AYAH RANGE INTERACTION ENGINE
+// =========================================================
+
+let isAyahRangeActive = false;
+let ayahRangeStart = 1;
+let ayahRangeEnd = 5;
+
+const RANGE_ACTIVE_STORAGE_KEY = 'quran_memorize_range_active';
+const RANGE_START_STORAGE_KEY = 'quran_memorize_range_start';
+const RANGE_END_STORAGE_KEY = 'quran_memorize_range_end';
+
+function loadAyahRangeState() {
+  try {
+    const savedActive = localStorage.getItem(RANGE_ACTIVE_STORAGE_KEY);
+    const savedStart = localStorage.getItem(RANGE_START_STORAGE_KEY);
+    const savedEnd = localStorage.getItem(RANGE_END_STORAGE_KEY);
+
+    if (savedActive !== null) isAyahRangeActive = savedActive === 'true';
+    if (savedStart !== null) ayahRangeStart = parseInt(savedStart, 10) || 1;
+    if (savedEnd !== null) ayahRangeEnd = parseInt(savedEnd, 10) || 5;
+  } catch (e) {}
+}
+
+function saveAyahRangeState() {
+  try {
+    localStorage.setItem(RANGE_ACTIVE_STORAGE_KEY, String(isAyahRangeActive));
+    localStorage.setItem(RANGE_START_STORAGE_KEY, String(ayahRangeStart));
+    localStorage.setItem(RANGE_END_STORAGE_KEY, String(ayahRangeEnd));
+  } catch (e) {}
+}
+
+function toggleAyahRangePopover() {
+  const popover = document.getElementById('memRangePopover');
+  if (!popover) return;
+  popover.classList.toggle('show');
+  vibrateGamepad(30, 0.2, 0);
+}
+
+function applyAyahRangeState() {
+  const totalVerses = (surahData && surahData.verses) ? surahData.verses.length : 286;
+  ayahRangeStart = Math.max(1, Math.min(ayahRangeStart, totalVerses));
+  ayahRangeEnd = Math.max(ayahRangeStart, Math.min(ayahRangeEnd, totalVerses));
+
+  saveAyahRangeState();
+
+  const toggleBtn = document.getElementById('memToggleRangeBtn');
+  const badge = document.getElementById('memRangeBadge');
+  const toggleActive = document.getElementById('toggleAyahRangeActive');
+  const inputStart = document.getElementById('inputAyahRangeStart');
+  const inputEnd = document.getElementById('inputAyahRangeEnd');
+
+  if (toggleActive) toggleActive.checked = isAyahRangeActive;
+  if (inputStart) {
+    inputStart.value = ayahRangeStart;
+    inputStart.max = totalVerses;
+  }
+  if (inputEnd) {
+    inputEnd.value = ayahRangeEnd;
+    inputEnd.max = totalVerses;
+  }
+
+  if (toggleBtn) toggleBtn.classList.toggle('active', isAyahRangeActive);
+  if (badge) {
+    badge.textContent = `${ayahRangeStart}-${ayahRangeEnd}`;
+    badge.style.display = isAyahRangeActive ? 'inline-block' : 'none';
+  }
+
+  if (!surahData || !surahData.verses) return;
+
+  // Apply DOM classes and visibility
+  surahData.verses.forEach((verse, idx) => {
+    const isSelected = !isAyahRangeActive || (verse.verseNumber >= ayahRangeStart && verse.verseNumber <= ayahRangeEnd);
+    const spanReading = document.getElementById(`reading-verse-span-${idx}`);
+    const cardVbv = document.getElementById(`vbv-card-${idx}`);
+
+    if (spanReading) spanReading.classList.toggle('range-unselected-verse', !isSelected);
+    if (cardVbv) cardVbv.classList.toggle('range-unselected-verse', !isSelected);
+
+    // If outside range and in memorize mode: ensure words stay hidden
+    if (!isSelected && isMemorizeMode) {
+      for (let i = verse.startWordIdx; i <= verse.endWordIdx; i++) {
+        const wEl = totalWordElements[i];
+        if (wEl) {
+          wEl.classList.add('memorize-hidden');
+          wEl.classList.remove('review-mastered-visible', 'persist-visible', 'mem-active-focus');
+        }
+      }
+    }
+  });
+
+  // If active ayah is outside the selected range, switch to range start
+  if (isAyahRangeActive) {
+    const curAyah = getActiveMemorizeVerseNum();
+    if (curAyah < ayahRangeStart || curAyah > ayahRangeEnd) {
+      switchToAyah(ayahRangeStart);
+    }
+  }
+
+  updateAyahMarkersVisibility();
+}
+
+function initAyahRangeMode() {
+  loadAyahRangeState();
+
+  const toggleBtn = document.getElementById('memToggleRangeBtn');
+  const popover = document.getElementById('memRangePopover');
+  const toggleActive = document.getElementById('toggleAyahRangeActive');
+  const inputStart = document.getElementById('inputAyahRangeStart');
+  const inputEnd = document.getElementById('inputAyahRangeEnd');
+  const applyBtn = document.getElementById('btnApplyAyahRange');
+
+  if (toggleBtn && popover) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      popover.classList.toggle('show');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#memToggleRangeBtn') && !e.target.closest('#memRangePopover')) {
+        popover.classList.remove('show');
+      }
+    });
+  }
+
+  if (toggleActive) {
+    toggleActive.addEventListener('change', (e) => {
+      isAyahRangeActive = e.target.checked;
+      applyAyahRangeState();
+      showToastNotification(isAyahRangeActive ? `Ayah Range active: Ayahs ${ayahRangeStart}-${ayahRangeEnd}` : 'Ayah Range disabled (Full Surah)');
+    });
+  }
+
+  if (applyBtn) {
+    applyBtn.addEventListener('click', () => {
+      if (inputStart) ayahRangeStart = parseInt(inputStart.value, 10) || 1;
+      if (inputEnd) ayahRangeEnd = parseInt(inputEnd.value, 10) || 5;
+      isAyahRangeActive = true;
+      if (toggleActive) toggleActive.checked = true;
+      applyAyahRangeState();
+      if (popover) popover.classList.remove('show');
+      showToastNotification(`Ayah Range set: Ayahs ${ayahRangeStart}-${ayahRangeEnd}`);
+    });
+  }
+
+  // Presets
+  document.querySelectorAll('.mem-range-preset-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const preset = e.currentTarget.getAttribute('data-preset');
+      const total = (surahData && surahData.verses) ? surahData.verses.length : 286;
+      const cur = getActiveMemorizeVerseNum();
+
+      if (preset === 'current') {
+        ayahRangeStart = cur;
+        ayahRangeEnd = cur;
+      } else if (preset === '3') {
+        ayahRangeStart = cur;
+        ayahRangeEnd = Math.min(total, cur + 2);
+      } else if (preset === '5') {
+        ayahRangeStart = cur;
+        ayahRangeEnd = Math.min(total, cur + 4);
+      } else if (preset === '10') {
+        ayahRangeStart = cur;
+        ayahRangeEnd = Math.min(total, cur + 9);
+      } else if (preset === 'all') {
+        ayahRangeStart = 1;
+        ayahRangeEnd = total;
+      }
+
+      if (inputStart) inputStart.value = ayahRangeStart;
+      if (inputEnd) inputEnd.value = ayahRangeEnd;
+    });
+  });
+
+  applyAyahRangeState();
+}
+
+function initMeaningHuds() {
+  const wmhClose = document.getElementById('wmhCloseBtn');
+  const wmhAudio = document.getElementById('wmhBtnPlayAudio');
+  const wmhAyahMeaning = document.getElementById('wmhBtnAyahMeaning');
+  const amhClose = document.getElementById('amhCloseBtn');
+  const amhAudio = document.getElementById('amhBtnPlayAyah');
+
+  if (wmhClose) wmhClose.addEventListener('click', () => {
+    const hud = document.getElementById('wordMeaningHud');
+    if (hud) hud.style.display = 'none';
+  });
+
+  if (wmhAudio) wmhAudio.addEventListener('click', playActiveWordAudio);
+  if (wmhAyahMeaning) wmhAyahMeaning.addEventListener('click', () => {
+    const wHud = document.getElementById('wordMeaningHud');
+    if (wHud) wHud.style.display = 'none';
+    toggleActiveAyahMeaningHud();
+  });
+
+  if (amhClose) amhClose.addEventListener('click', () => {
+    const hud = document.getElementById('ayahMeaningHud');
+    if (hud) hud.style.display = 'none';
+  });
+
+  if (amhAudio) amhAudio.addEventListener('click', playActiveAyahAudio);
 }
 
 // =========================================================
@@ -10093,10 +10631,13 @@ bootstrapRevlogFromExistingCards();
 initGdriveSync();
 initGamepadSupport();
 initFloatingCounter();
+initAyahRangeMode();
+initMeaningHuds();
 checkUrlHashSync();
 showLibraryView();
 loadSurah(76).then(() => {
   updateCounterAyahTag();
+  applyAyahRangeState();
   updateFsrsBadgeAndNotifications(false);
   updateOfflineStorageStatus();
   if (isLibraryView) {

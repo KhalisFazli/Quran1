@@ -282,6 +282,46 @@
         <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleCounterBtn" title="Repetition Counter & Tasbih (Hotkey: 'C')">
           <span style="font-size:0.95rem; line-height:1;">📿</span>
         </button>
+
+        <!-- 10. Ayah Range Interaction Mode -->
+        <div class="mem-arch-wrapper" style="position: relative;">
+          <button type="button" class="mem-arch-btn mem-circle-btn" id="memToggleRangeBtn" title="Ayah Range Mode: Only selected Ayahs can be revealed/unrevealed">
+            <span style="font-size:0.95rem; line-height:1;">↔️</span>
+            <span class="mem-range-badge" id="memRangeBadge" style="display:none;">1-5</span>
+          </button>
+
+          <div class="mem-range-popover" id="memRangePopover">
+            <div class="mem-range-title">
+              <span>Ayah Range Selection</span>
+              <label class="toggle-switch small" title="Enable / Disable Range constraint">
+                <input type="checkbox" id="toggleAyahRangeActive" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="mem-range-desc">Only selected Ayahs can be revealed. Others remain hidden.</div>
+            <div class="mem-range-inputs">
+              <div class="mem-range-field">
+                <label>From Ayah</label>
+                <input type="number" id="inputAyahRangeStart" min="1" max="286" value="1" />
+              </div>
+              <span class="mem-range-sep">➔</span>
+              <div class="mem-range-field">
+                <label>To Ayah</label>
+                <input type="number" id="inputAyahRangeEnd" min="1" max="286" value="5" />
+              </div>
+            </div>
+            <div class="mem-range-presets">
+              <button type="button" class="mem-range-preset-btn" data-preset="current">Current</button>
+              <button type="button" class="mem-range-preset-btn" data-preset="3">+3 Ayahs</button>
+              <button type="button" class="mem-range-preset-btn" data-preset="5">+5 Ayahs</button>
+              <button type="button" class="mem-range-preset-btn" data-preset="10">+10 Ayahs</button>
+              <button type="button" class="mem-range-preset-btn" data-preset="all">Full Surah</button>
+            </div>
+            <div class="mem-range-footer">
+              <button type="button" class="mem-range-apply-btn" id="btnApplyAyahRange">Apply & Focus</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1401,15 +1441,21 @@
         <!-- Quick Mapping Reference -->
         <details class="controller-mapping-details" style="margin-top:8px;">
           <summary style="font-size:0.76rem; font-weight:600; color:#8c7860; cursor:pointer;">📖 View Button Shortcuts</summary>
-          <div style="font-size:0.72rem; color:#475569; margin-top:6px; line-height:1.55; background:#fdfaf5; padding:8px 10px; border-radius:6px; border:1px solid #ebdcc4;">
-            <div>• <strong>A / RB / RT / D-Right / Space</strong>: Reveal next word</div>
-            <div>• <strong>B / LB / LT / D-Left</strong>: Unreveal previous word</div>
-            <div>• <strong>D-Pad Down</strong>: Switch to Next Ayah</div>
-            <div>• <strong>D-Pad Up</strong>: Switch to Previous Ayah</div>
-            <div>• <strong>X (Square)</strong>: Mark / Unmark mistake on word</div>
-            <div>• <strong>Y (Triangle) / Start</strong>: Play / Pause Ayah recitation</div>
-            <div>• <strong>1, 2, 3, 4 (X, B, A, Y)</strong>: Grade card in FSRS review modal</div>
-            <div>• <strong>Thumbstick (Analog)</strong>: Smooth vertical page scroll</div>
+          <div style="font-size:0.72rem; color:#475569; margin-top:6px; line-height:1.6; background:#fdfaf5; padding:8px 10px; border-radius:6px; border:1px solid #ebdcc4;">
+            <div>• <strong>A / D-Pad Right</strong>: Reveal next word (Hold for rapid)</div>
+            <div>• <strong>B / D-Pad Left</strong>: Unreveal previous word (Hold for rapid)</div>
+            <div>• <strong>RT (R2 Trigger)</strong>: Reveal / Hide All (in range)</div>
+            <div>• <strong>R3 (Right Stick Click)</strong>: Toggle Grade Mode (FSRS)</div>
+            <div>• <strong>X (Square)</strong>: Mark / Unmark Mistake on word</div>
+            <div>• <strong>L3 (Left Stick Click)</strong>: Repetition Counter (Tasbih)</div>
+            <div>• <strong>LB (L1 Bumper)</strong>: Show Word Meaning popup</div>
+            <div>• <strong>RB (R1 Bumper)</strong>: Show Ayah Meaning translation</div>
+            <div>• <strong>LT (L2 Trigger)</strong>: Play Word Pronunciation Audio</div>
+            <div>• <strong>Y (Triangle)</strong>: Play / Pause Ayah Recitation</div>
+            <div>• <strong>D-Pad Down / Up</strong>: Next / Prev Ayah (Range bounded)</div>
+            <div>• <strong>Back / Select</strong>: Toggle Ayah Range Mode</div>
+            <div>• <strong>Start / Menu</strong>: Toggle Memorize Mode</div>
+            <div>• <strong>Thumbsticks</strong>: Smooth vertical page scroll</div>
           </div>
         </details>
       </div>
@@ -1655,6 +1701,58 @@
     <span class="fcp-icon">📿</span>
     <span class="fcp-number" id="fcpNumberDisplay">0</span>
     <button type="button" class="fcp-btn-plus" id="fcpQuickPlus" title="Quick increment (+1)">+</button>
+  </div>
+
+  <!-- Floating Word Meaning HUD (Triggered via Controller [LB] or Hotkey 'W') -->
+  <div class="word-meaning-hud" id="wordMeaningHud" style="display:none;">
+    <div class="wmh-header">
+      <div class="wmh-header-left">
+        <span class="wmh-icon">📖</span>
+        <span class="wmh-title">Word Meaning</span>
+        <span class="wmh-ref" id="wmhRef">76:1 • Word 1</span>
+      </div>
+      <button type="button" class="wmh-close-btn" id="wmhCloseBtn" title="Close (LB or Esc)">✕</button>
+    </div>
+    <div class="wmh-body">
+      <div class="wmh-arabic" id="wmhArabic">هَلْ</div>
+      <div class="wmh-translit" id="wmhTranslit">hal</div>
+      <div class="wmh-meaning" id="wmhMeaning">Has there [not]</div>
+    </div>
+    <div class="wmh-footer">
+      <button type="button" class="wmh-btn-action" id="wmhBtnPlayAudio" title="Play Word Pronunciation (Controller [LT] / Key 'Q')">
+        🔊 Play Audio <kbd>LT</kbd>
+      </button>
+      <button type="button" class="wmh-btn-action" id="wmhBtnAyahMeaning" title="View Full Ayah Translation (Controller [RB] / Key 'A')">
+        📜 Ayah Meaning <kbd>RB</kbd>
+      </button>
+    </div>
+  </div>
+
+  <!-- Floating Ayah Meaning HUD (Triggered via Controller [RB] or Hotkey 'A') -->
+  <div class="ayah-meaning-hud" id="ayahMeaningHud" style="display:none;">
+    <div class="amh-header">
+      <div class="amh-header-left">
+        <span class="amh-icon">📜</span>
+        <span class="amh-title">Ayah Meaning</span>
+        <span class="amh-badge" id="amhRef">Surah 76 • Ayah 1</span>
+      </div>
+      <button type="button" class="amh-close-btn" id="amhCloseBtn" title="Close (RB or Esc)">✕</button>
+    </div>
+    <div class="amh-body">
+      <div class="amh-lang-block">
+        <span class="amh-lang-label">English (Saheeh International)</span>
+        <div class="amh-trans-text" id="amhTransEn">Has there [not] come upon man a period of time...</div>
+      </div>
+      <div class="amh-lang-block" id="amhBlockId">
+        <span class="amh-lang-label">Indonesian (Kemenag)</span>
+        <div class="amh-trans-text" id="amhTransId">Bukankah telah datang atas manusia satu waktu...</div>
+      </div>
+    </div>
+    <div class="amh-footer">
+      <button type="button" class="amh-btn-action" id="amhBtnPlayAyah" title="Play / Pause Recitation (Controller [Y] / Space)">
+        ▶ Play Ayah <kbd>Y</kbd>
+      </button>
+    </div>
   </div>
 
   <audio id="audioPlayer"></audio>

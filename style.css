@@ -6493,5 +6493,438 @@ body.memorize-active .floating-counter-pill {
   border: 1.5px solid #fff;
 }
 
+/* =========================================================
+   AYAH RANGE INTERACTION STYLES
+   ========================================================= */
+
+.mem-range-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background: #0284c7;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 9px;
+  border: 1.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.mem-range-popover {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-line, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 12px 14px;
+  width: 250px;
+  z-index: 1050;
+  color: var(--text-main, #1e293b);
+  animation: popoverFadeIn 0.15s ease-out;
+}
+
+.mem-range-popover.show {
+  display: block;
+}
+
+.mem-range-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.mem-range-desc {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.mem-range-inputs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  background: #f8fafc;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.mem-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.mem-range-field label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.mem-range-field input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  background: #fff;
+  color: #0f172a;
+  outline: none;
+}
+
+.mem-range-field input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.mem-range-sep {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  padding-top: 14px;
+}
+
+.mem-range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.mem-range-preset-btn {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #475569;
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mem-range-preset-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.mem-range-footer {
+  display: flex;
+}
+
+.mem-range-apply-btn {
+  width: 100%;
+  background: #0284c7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.mem-range-apply-btn:hover {
+  background: #0369a1;
+}
+
+/* Range Unselected / Excluded Ayahs */
+.range-unselected-verse {
+  opacity: 0.18 !important;
+  filter: grayscale(1) blur(0.4px);
+  pointer-events: none !important;
+  user-select: none !important;
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+.range-unselected-verse .mushaf-word {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+/* =========================================================
+   WORD MEANING & AYAH MEANING FLOATING HUDS
+   ========================================================= */
+
+.word-meaning-hud,
+.ayah-meaning-hud {
+  position: fixed;
+  z-index: 10000;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.2), 0 6px 16px -2px rgba(0, 0, 0, 0.08);
+  color: #1e293b;
+  overflow: hidden;
+  animation: hudFadeUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes hudFadeUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Word Meaning HUD */
+.word-meaning-hud {
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 380px;
+  padding: 12px 14px;
+}
+
+.wmh-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.wmh-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wmh-icon {
+  font-size: 0.95rem;
+}
+
+.wmh-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wmh-ref {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+
+.wmh-close-btn,
+.amh-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.9rem;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.wmh-close-btn:hover,
+.amh-close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.wmh-body {
+  text-align: center;
+  padding: 4px 0 8px 0;
+}
+
+.wmh-arabic {
+  font-family: var(--font-arabic, 'Amiri', serif);
+  font-size: 1.85rem;
+  line-height: 1.4;
+  color: #0f172a;
+  direction: rtl;
+}
+
+.wmh-translit {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.wmh-meaning {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0284c7;
+  margin-top: 4px;
+}
+
+.wmh-footer,
+.amh-footer {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+}
+
+.wmh-btn-action,
+.amh-btn-action {
+  flex: 1;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.wmh-btn-action:hover,
+.amh-btn-action:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.wmh-btn-action kbd,
+.amh-btn-action kbd {
+  background: #0f172a;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* Ayah Meaning HUD */
+.ayah-meaning-hud {
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92%;
+  max-width: 480px;
+  padding: 14px 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.amh-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.amh-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.amh-icon {
+  font-size: 1.05rem;
+}
+
+.amh-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.amh-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.amh-lang-block {
+  margin-bottom: 10px;
+}
+
+.amh-lang-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.amh-trans-text {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #1e293b;
+  background: #f8fafc;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 3px solid #0284c7;
+}
+
+/* Dark mode overrides for HUDs */
+[data-theme="dark"] .word-meaning-hud,
+[data-theme="dark"] .ayah-meaning-hud,
+[data-theme="dark"] .mem-range-popover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .wmh-title,
+[data-theme="dark"] .amh-title,
+[data-theme="dark"] .mem-range-title {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .wmh-arabic {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .amh-trans-text,
+[data-theme="dark"] .mem-range-inputs {
+  background: #0f172a;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .wmh-btn-action,
+[data-theme="dark"] .amh-btn-action,
+[data-theme="dark"] .mem-range-preset-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .wmh-btn-action:hover,
+[data-theme="dark"] .amh-btn-action:hover,
+[data-theme="dark"] .mem-range-preset-btn:hover {
+  background: #334155;
+  color: #fff;
+}
+
 
 
