@@ -6052,5 +6052,446 @@ body.memorize-active .vbv-trans-hidden:hover {
   box-shadow: 0 0 6px rgba(180, 83, 9, 0.45);
 }
 
+/* ========================================================= */
+/* Floating Draggable Repetition Counter & Tasbih Window */
+/* ========================================================= */
+.floating-counter-window {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  width: 310px;
+  max-width: calc(100vw - 24px);
+  background: var(--bg-card, #ffffff);
+  border: 1px solid #ebdcc4;
+  border-radius: 14px;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06);
+  z-index: 350;
+  overflow: hidden;
+  font-family: inherit;
+  transition: box-shadow 0.2s ease, opacity 0.2s ease;
+  user-select: none;
+}
+
+body.memorize-active .floating-counter-window {
+  bottom: 130px;
+}
+
+.fc-header {
+  background: #fbf7ee;
+  border-bottom: 1px solid #ebdcc4;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: grab;
+  touch-action: none;
+}
+
+.fc-header:active {
+  cursor: grabbing;
+}
+
+.fc-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fc-header-icon {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.fc-header-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main, #2b2e35);
+  white-space: nowrap;
+}
+
+.fc-ayah-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid #fde68a;
+  white-space: nowrap;
+}
+
+.fc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fc-btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  color: #64748b;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fc-btn-icon:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1e293b;
+}
+
+.fc-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fc-target-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.fc-target-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fc-target-select {
+  font-size: 0.76rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #dcd0bc;
+  background: #fff;
+  color: #2b2e35;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fc-progress-pill {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid #bae6fd;
+}
+
+.fc-display-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0 2px 0;
+  position: relative;
+}
+
+.fc-number-display {
+  font-size: 3.2rem;
+  font-weight: 800;
+  color: var(--text-main, #2b2e35);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+  transition: transform 0.08s ease, color 0.15s ease;
+}
+
+.fc-number-display.pulse {
+  transform: scale(1.12);
+  color: #b45309;
+}
+
+.fc-goal-reached-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #047857;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-top: 4px;
+  animation: goalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes goalPop {
+  0% { transform: scale(0.7); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.fc-actions-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.fc-btn-counter {
+  border: none;
+  border-radius: 10px;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.08s ease, background 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.fc-btn-counter:active {
+  transform: scale(0.94);
+}
+
+.fc-btn-dec {
+  width: 65px;
+  height: 52px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+}
+
+.fc-btn-dec:hover {
+  background: #e2e8f0;
+}
+
+.fc-btn-inc {
+  flex: 1;
+  height: 52px;
+  background: #b45309;
+  border: 1px solid #92400e;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(180, 83, 9, 0.3);
+}
+
+.fc-btn-inc:hover {
+  background: #92400e;
+}
+
+.fc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #f0e6d6;
+}
+
+.fc-btn-sub {
+  background: #fff;
+  border: 1px solid #dcd0bc;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.fc-btn-sub:hover {
+  background: #fbf7ee;
+  color: #b45309;
+  border-color: #ebdcc4;
+}
+
+.fc-auto-next-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.fc-auto-next-label input {
+  cursor: pointer;
+  accent-color: #b45309;
+}
+
+.fc-hint-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #fdfaf5;
+  border: 1px solid #ebdcc4;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  color: #78716c;
+  line-height: 1.35;
+}
+
+.fc-hint-bar code {
+  background: #fff;
+  border: 1px solid #e2d7c0;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+/* History View inside Floating Window */
+.fc-history-view {
+  padding: 10px 12px;
+}
+
+.fc-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ebdcc4;
+}
+
+.fc-history-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #8c7860;
+  text-transform: uppercase;
+}
+
+.fc-history-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.fc-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fdfaf5;
+  border: 1px solid #f0e6d6;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.74rem;
+}
+
+.fc-history-item-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.fc-hist-surah {
+  font-weight: 600;
+  color: #2b2e35;
+}
+
+.fc-hist-time {
+  font-size: 0.66rem;
+  color: #94a3b8;
+}
+
+.fc-history-item-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.fc-hist-count {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #b45309;
+}
+
+.fc-hist-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #d1fae5;
+  color: #047857;
+}
+
+/* Minimized Floating Pill */
+.floating-counter-pill {
+  position: fixed;
+  bottom: 85px;
+  right: 20px;
+  background: #2b2e35;
+  color: #fff;
+  border-radius: 30px;
+  padding: 5px 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  z-index: 350;
+  transition: transform 0.15s ease, background 0.15s ease;
+  user-select: none;
+}
+
+body.memorize-active .floating-counter-pill {
+  bottom: 135px;
+}
+
+.floating-counter-pill:hover {
+  transform: scale(1.05);
+  background: #1e293b;
+}
+
+.fcp-number {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #fbbf24;
+  font-variant-numeric: tabular-nums;
+}
+
+.fcp-btn-plus {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fcp-btn-plus:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.counter-mini-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: #b45309;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border: 1.5px solid #fff;
+}
+
 
 

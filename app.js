@@ -2933,15 +2933,20 @@ function unrevealPreviousWord(isRapid = false) {
   }
 }
 
-function setupHoldZone(btnElement, actionFn) {
+function setupHoldZone(btnElement, actionFn, initialDelay = 280, repeatInterval = 75) {
+  if (!btnElement) return;
+  let holdTimeout = null;
+  let holdInterval = null;
+
   const startHold = (e) => {
-    e.preventDefault();
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    if (e.cancelable && e.type === 'touchstart') e.preventDefault();
     actionFn(false); // Single tap / initial press
     clearTimeout(holdTimeout);
     clearInterval(holdInterval);
     holdTimeout = setTimeout(() => {
-      holdInterval = setInterval(() => actionFn(true), 75); // Rapid hold mode
-    }, 300);
+      holdInterval = setInterval(() => actionFn(true), repeatInterval); // Rapid hold mode
+    }, initialDelay);
   };
 
   const clearHold = () => {
@@ -2960,21 +2965,19 @@ function setupHoldZone(btnElement, actionFn) {
 setupHoldZone(memRevealZoneBtn, revealNextWord);
 setupHoldZone(memUnrevealZoneBtn, unrevealPreviousWord);
 
-// Ayah Switch Buttons in Memorize Mode (Image 2)
+// Ayah Switch Buttons in Memorize Mode (Tap or Hold)
 if (memPrevAyahBtn) {
-  memPrevAyahBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  setupHoldZone(memPrevAyahBtn, () => {
     const cur = getActiveMemorizeVerseNum();
     switchToAyah(cur - 1);
-  });
+  }, 320, 200);
 }
 
 if (memNextAyahBtn) {
-  memNextAyahBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  setupHoldZone(memNextAyahBtn, () => {
     const cur = getActiveMemorizeVerseNum();
     switchToAyah(cur + 1);
-  });
+  }, 320, 200);
 }
 
 // Prevent clicks in the top-right action buttons from triggering the Reveal button underneath
@@ -3640,6 +3643,10 @@ window.switchToAyah = function(targetAyah, autoPlayIfPlaying = false) {
       activeCard.classList.add('vbv-active-card');
       activeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
+
+  if (typeof updateCounterAyahTag === 'function') {
+    updateCounterAyahTag();
   }
 
   showToastNotification(`Ayah ${targetAyah}`);
@@ -6311,6 +6318,37 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // Floating Counter Toggle Hotkey: 'c' or 't'
+  if (e.key.toLowerCase() === 'c' || e.key.toLowerCase() === 't') {
+    e.preventDefault();
+    if (typeof toggleFloatingCounter === 'function') toggleFloatingCounter();
+    return;
+  }
+
+  // Floating Counter Active Hotkeys (+ / Space: Inc, -: Dec, 0: Reset, Esc: Close)
+  if (typeof isFloatingCounterActive === 'function' && isFloatingCounterActive()) {
+    if (e.key === '+' || e.key === '=' || e.key === ' ') {
+      e.preventDefault();
+      incrementFloatingCounter(e.repeat);
+      return;
+    }
+    if (e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      decrementFloatingCounter(e.repeat);
+      return;
+    }
+    if (e.key === '0') {
+      e.preventDefault();
+      if (!e.repeat) resetFloatingCounter();
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeFloatingCounter();
+      return;
+    }
+  }
+
   // Remote Clickers & Media buttons: Play / Pause
   if (e.key === 'MediaPlayPause') {
     e.preventDefault();
@@ -6335,15 +6373,15 @@ window.addEventListener('keydown', (e) => {
   }
 
   if (isMemorizeMode) {
-    // ArrowRight, Space, Enter, PageDown, MediaTrackNext: reveal next word in active ayah
+    // ArrowRight, Space, Enter, PageDown, MediaTrackNext: reveal next word in active ayah (hold supported)
     if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter' || e.key === 'PageDown' || e.key === 'MediaTrackNext' || e.key.toLowerCase() === 'j') {
       e.preventDefault();
-      revealNextWord(false);
+      revealNextWord(e.repeat);
     }
-    // ArrowLeft, Backspace, PageUp, MediaTrackPrevious: unreveal previous word in active ayah
+    // ArrowLeft, Backspace, PageUp, MediaTrackPrevious: unreveal previous word in active ayah (hold supported)
     else if (e.key === 'ArrowLeft' || e.key === 'Backspace' || e.key === 'PageUp' || e.key === 'MediaTrackPrevious' || e.key.toLowerCase() === 'k') {
       e.preventDefault();
-      unrevealPreviousWord(false);
+      unrevealPreviousWord(e.repeat);
     }
     // 'r': Toggle Voice Recorder
     else if (e.key.toLowerCase() === 'r') {
@@ -6529,7 +6567,49 @@ function handleControllerButtonPress(buttonIndex, gamepad) {
     return;
   }
 
-  // 2. Navigation & Memorize Actions
+  // 2. Floating Counter Controls (Active when window is open or minimized pill is active)
+  const isCounterOpen = (typeof isFloatingCounterActive === 'function') && isFloatingCounterActive();
+  if (isCounterOpen) {
+    // Increment (+1): A (0), RB (5), RT (7), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+      incrementFloatingCounter(false);
+      vibrateGamepad(25, 0.25, 0);
+      return;
+    }
+    // Decrement (-1): B (1), LB (4), LT (6), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+      decrementFloatingCounter(false);
+      vibrateGamepad(20, 0.2, 0);
+      return;
+    }
+    // Save Log to History: X / Square (2)
+    if (buttonIndex === 2) {
+      logCounterSession();
+      vibrateGamepad(50, 0.4, 0.2);
+      return;
+    }
+    // Reset Counter: Y / Triangle (3)
+    if (buttonIndex === 3) {
+      resetFloatingCounter();
+      vibrateGamepad(40, 0.3, 0.1);
+      return;
+    }
+    // Toggle / Close Counter: Back / Select (8) or L3 (10)
+    if (buttonIndex === 8 || buttonIndex === 10) {
+      toggleFloatingCounter();
+      vibrateGamepad(40, 0.3, 0);
+      return;
+    }
+  } else {
+    // When Counter is Closed: L3 (10) or Back (8, in reader mode) opens counter
+    if (buttonIndex === 10 || (!isMemorizeMode && buttonIndex === 8)) {
+      toggleFloatingCounter();
+      vibrateGamepad(50, 0.3, 0.1);
+      return;
+    }
+  }
+
+  // 3. Navigation & Memorize Actions
   if (isMemorizeMode) {
     // Reveal next word: A (0), RB (5), RT (7), D-Right (15)
     if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
@@ -6580,8 +6660,8 @@ function handleControllerButtonPress(buttonIndex, gamepad) {
       return;
     }
 
-    // Toggle Voice Recorder: Back / Select (8) or L3 (10)
-    if (buttonIndex === 8 || buttonIndex === 10) {
+    // Toggle Voice Recorder: Back / Select (8)
+    if (buttonIndex === 8) {
       toggleVoiceRecorder();
       vibrateGamepad(50, 0.3, 0.1);
       return;
@@ -6634,8 +6714,78 @@ function handleControllerButtonPress(buttonIndex, gamepad) {
   }
 }
 
+function handleControllerButtonHold(buttonIndex, gamepad) {
+  const isCounterOpen = (typeof isFloatingCounterActive === 'function') && isFloatingCounterActive();
+  if (isCounterOpen) {
+    // Increment: A (0), RB (5), RT (7), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+      incrementFloatingCounter(true);
+      vibrateGamepad(15, 0.15, 0);
+      return;
+    }
+    // Decrement: B (1), LB (4), LT (6), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+      decrementFloatingCounter(true);
+      vibrateGamepad(15, 0.1, 0);
+      return;
+    }
+    return;
+  }
+
+  if (isMemorizeMode) {
+    // Rapid word reveal on hold: A (0), RB (5), RT (7), D-Right (15)
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 15) {
+      revealNextWord(true);
+      vibrateGamepad(15, 0.15, 0);
+      return;
+    }
+
+    // Rapid word unreveal on hold: B (1), LB (4), LT (6), D-Left (14)
+    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 14) {
+      unrevealPreviousWord(true);
+      vibrateGamepad(15, 0.1, 0);
+      return;
+    }
+
+    // Next Ayah on hold: D-Down (13)
+    if (buttonIndex === 13) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur + 1);
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+
+    // Previous Ayah on hold: D-Up (12)
+    if (buttonIndex === 12) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur - 1);
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+  } else {
+    // Normal Reading / VBV Mode on hold: Next Ayah
+    if (buttonIndex === 0 || buttonIndex === 5 || buttonIndex === 7 || buttonIndex === 13 || buttonIndex === 15) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur + 1);
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+
+    // Normal Reading / VBV Mode on hold: Previous Ayah
+    if (buttonIndex === 1 || buttonIndex === 4 || buttonIndex === 6 || buttonIndex === 12 || buttonIndex === 14) {
+      const cur = getActiveMemorizeVerseNum();
+      switchToAyah(cur - 1);
+      vibrateGamepad(30, 0.2, 0);
+      return;
+    }
+  }
+}
+
+let buttonHoldState = {};
+
 function pollGamepads() {
   const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const now = performance.now();
 
   for (let i = 0; i < gamepads.length; i++) {
     const gp = gamepads[i];
@@ -6643,6 +6793,9 @@ function pollGamepads() {
 
     if (!lastButtonStates[gp.index]) {
       lastButtonStates[gp.index] = {};
+    }
+    if (!buttonHoldState[gp.index]) {
+      buttonHoldState[gp.index] = {};
     }
 
     // Check buttons
@@ -6652,8 +6805,30 @@ function pollGamepads() {
       const wasPressed = !!lastButtonStates[gp.index][b];
 
       if (isPressed && !wasPressed) {
+        // Initial Press
         handleControllerButtonPress(b, gp);
+        buttonHoldState[gp.index][b] = {
+          startTime: now,
+          lastRepeatTime: now
+        };
+      } else if (isPressed && wasPressed) {
+        // Button held down -> auto-repeat check
+        const hold = buttonHoldState[gp.index][b];
+        if (hold) {
+          const isAyahNav = (b === 12 || b === 13);
+          const initDelay = 280;
+          const repeatInterval = isAyahNav ? 200 : 75;
+
+          if (now - hold.startTime >= initDelay && now - hold.lastRepeatTime >= repeatInterval) {
+            handleControllerButtonHold(b, gp);
+            hold.lastRepeatTime = now;
+          }
+        }
+      } else if (!isPressed && wasPressed) {
+        // Released
+        delete buttonHoldState[gp.index][b];
       }
+
       lastButtonStates[gp.index][b] = isPressed;
     }
 
@@ -6687,6 +6862,7 @@ function initGamepadSupport() {
   window.addEventListener('gamepaddisconnected', (e) => {
     delete connectedGamepads[e.gamepad.index];
     delete lastButtonStates[e.gamepad.index];
+    delete buttonHoldState[e.gamepad.index];
     updateControllerStatusUI();
     showToastNotification('🎮 Controller disconnected');
     const remaining = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
@@ -6700,6 +6876,476 @@ function initGamepadSupport() {
   if (navigator.getGamepads && !gamepadPollRaf) {
     gamepadPollRaf = requestAnimationFrame(pollGamepads);
   }
+}
+
+// =========================================================
+// FLOATING REPETITION / TASBIH COUNTER & HISTORY ENGINE
+// =========================================================
+
+const COUNTER_STORAGE_KEY = 'quran_repetition_counter_state';
+const COUNTER_HISTORY_STORAGE_KEY = 'quran_repetition_counter_history';
+const COUNTER_POS_STORAGE_KEY = 'quran_repetition_counter_pos';
+
+let counterState = {
+  count: 0,
+  target: 10,
+  autoAdvance: true,
+  isOpen: false,
+  isMinimized: false
+};
+
+function loadCounterState() {
+  try {
+    const raw = localStorage.getItem(COUNTER_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      counterState = { ...counterState, ...parsed };
+    }
+  } catch (e) {}
+}
+
+function saveCounterState() {
+  try {
+    localStorage.setItem(COUNTER_STORAGE_KEY, JSON.stringify(counterState));
+  } catch (e) {}
+}
+
+function isFloatingCounterActive() {
+  const win = document.getElementById('floatingCounterWindow');
+  const pill = document.getElementById('floatingCounterPill');
+  return (win && win.style.display !== 'none') || (pill && pill.style.display !== 'none');
+}
+
+function updateCounterAyahTag() {
+  const tag = document.getElementById('fcCurrentAyahTag');
+  if (!tag) return;
+  const vNum = getActiveMemorizeVerseNum();
+  const sNum = currentSurahNumber || 1;
+  tag.textContent = `${sNum}:${vNum}`;
+}
+
+function updateCounterDisplay() {
+  const display = document.getElementById('fcNumberDisplay');
+  const pillDisplay = document.getElementById('fcpNumberDisplay');
+  const progressPill = document.getElementById('fcProgressPill');
+  const badge = document.getElementById('fcGoalReachedBadge');
+  const targetSelect = document.getElementById('fcTargetSelect');
+  const autoCheck = document.getElementById('fcAutoAdvanceCheck');
+
+  if (display) display.textContent = counterState.count;
+  if (pillDisplay) pillDisplay.textContent = counterState.count;
+
+  if (targetSelect) targetSelect.value = String(counterState.target);
+  if (autoCheck) autoCheck.checked = !!counterState.autoAdvance;
+
+  if (progressPill) {
+    if (counterState.target > 0) {
+      progressPill.textContent = `${counterState.count} / ${counterState.target}`;
+      progressPill.classList.toggle('reached', counterState.count >= counterState.target);
+    } else {
+      progressPill.textContent = 'Free Reps';
+      progressPill.classList.remove('reached');
+    }
+  }
+
+  if (badge) {
+    badge.style.display = (counterState.target > 0 && counterState.count >= counterState.target) ? 'inline-block' : 'none';
+  }
+
+  updateCounterAyahTag();
+}
+
+function triggerCounterBump() {
+  const display = document.getElementById('fcNumberDisplay');
+  if (display) {
+    display.classList.remove('pulse-bump');
+    void display.offsetWidth; // force CSS reflow
+    display.classList.add('pulse-bump');
+  }
+}
+
+function incrementFloatingCounter(isRapid = false) {
+  counterState.count++;
+  triggerCounterBump();
+
+  if (counterState.target > 0 && counterState.count === counterState.target) {
+    // Goal reached celebration!
+    vibrateGamepad(120, 0.7, 0.4);
+    showToastNotification(`🎉 Goal reached: ${counterState.target} repetitions!`);
+
+    if (counterState.autoAdvance) {
+      setTimeout(() => {
+        const cur = getActiveMemorizeVerseNum();
+        switchToAyah(cur + 1);
+        counterState.count = 0;
+        saveCounterState();
+        updateCounterDisplay();
+        showToastNotification(`Advanced to Ayah ${cur + 1}`);
+      }, 350);
+    }
+  } else {
+    if (!isRapid) vibrateGamepad(25, 0.25, 0);
+  }
+
+  saveCounterState();
+  updateCounterDisplay();
+}
+
+function decrementFloatingCounter(isRapid = false) {
+  if (counterState.count > 0) {
+    counterState.count--;
+    triggerCounterBump();
+    if (!isRapid) vibrateGamepad(20, 0.2, 0);
+    saveCounterState();
+    updateCounterDisplay();
+  }
+}
+
+function resetFloatingCounter() {
+  counterState.count = 0;
+  saveCounterState();
+  updateCounterDisplay();
+  vibrateGamepad(30, 0.2, 0);
+}
+
+function logCounterSession() {
+  if (counterState.count === 0) {
+    showToastNotification('Counter is at 0 — nothing to log yet.');
+    return;
+  }
+  const sNum = currentSurahNumber || 1;
+  const vNum = getActiveMemorizeVerseNum();
+  const sName = (surahData && surahData.meta && surahData.meta.englishName) ? surahData.meta.englishName : `Surah ${sNum}`;
+
+  const entry = {
+    id: Date.now(),
+    date: new Date().toLocaleString(),
+    surahNumber: sNum,
+    surahName: sName,
+    ayahNumber: vNum,
+    count: counterState.count,
+    target: counterState.target
+  };
+
+  try {
+    const raw = localStorage.getItem(COUNTER_HISTORY_STORAGE_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    list.unshift(entry);
+    if (list.length > 200) list.pop();
+    localStorage.setItem(COUNTER_HISTORY_STORAGE_KEY, JSON.stringify(list));
+    showToastNotification(`💾 Logged ${entry.count} reps for ${sName} [${sNum}:${vNum}]`);
+    renderCounterHistory();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function renderCounterHistory() {
+  const container = document.getElementById('fcHistoryList');
+  if (!container) return;
+
+  let list = [];
+  try {
+    const raw = localStorage.getItem(COUNTER_HISTORY_STORAGE_KEY);
+    if (raw) list = JSON.parse(raw);
+  } catch (e) {}
+
+  if (list.length === 0) {
+    container.innerHTML = `<div class="fc-history-empty">No count history yet.<br>Complete repetitions and click "Save Log".</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(item => `
+    <div class="fc-history-item">
+      <div class="fc-history-item-top">
+        <span class="fc-history-surah">${item.surahName} [${item.surahNumber}:${item.ayahNumber}]</span>
+        <span class="fc-history-count-badge">${item.count} reps${item.target > 0 ? ` (goal ${item.target})` : ''}</span>
+      </div>
+      <div class="fc-history-time">${item.date}</div>
+    </div>
+  `).join('');
+}
+
+function clearCounterHistory() {
+  if (confirm('Clear all repetition counter history logs?')) {
+    localStorage.removeItem(COUNTER_HISTORY_STORAGE_KEY);
+    renderCounterHistory();
+    showToastNotification('Repetition history cleared.');
+  }
+}
+
+function openFloatingCounter() {
+  const win = document.getElementById('floatingCounterWindow');
+  const pill = document.getElementById('floatingCounterPill');
+  const btnTop = document.getElementById('btnToggleFloatingCounter');
+  const btnMem = document.getElementById('memToggleCounterBtn');
+
+  if (pill) pill.style.display = 'none';
+  if (win) {
+    win.style.display = 'block';
+    clampWindowToViewport(win);
+  }
+  counterState.isOpen = true;
+  counterState.isMinimized = false;
+  saveCounterState();
+
+  if (btnTop) btnTop.classList.add('active');
+  if (btnMem) btnMem.classList.add('active');
+  updateCounterDisplay();
+}
+
+function closeFloatingCounter() {
+  const win = document.getElementById('floatingCounterWindow');
+  const pill = document.getElementById('floatingCounterPill');
+  const btnTop = document.getElementById('btnToggleFloatingCounter');
+  const btnMem = document.getElementById('memToggleCounterBtn');
+
+  if (win) win.style.display = 'none';
+  if (pill) pill.style.display = 'none';
+  counterState.isOpen = false;
+  counterState.isMinimized = false;
+  saveCounterState();
+
+  if (btnTop) btnTop.classList.remove('active');
+  if (btnMem) btnMem.classList.remove('active');
+}
+
+function minimizeFloatingCounter() {
+  const win = document.getElementById('floatingCounterWindow');
+  const pill = document.getElementById('floatingCounterPill');
+
+  if (win) win.style.display = 'none';
+  if (pill) pill.style.display = 'flex';
+  counterState.isOpen = true;
+  counterState.isMinimized = true;
+  saveCounterState();
+  updateCounterDisplay();
+}
+
+function toggleFloatingCounter() {
+  if (counterState.isOpen) {
+    if (counterState.isMinimized) {
+      openFloatingCounter();
+    } else {
+      closeFloatingCounter();
+    }
+  } else {
+    openFloatingCounter();
+  }
+}
+
+function clampWindowToViewport(el) {
+  if (!el || el.style.display === 'none') return;
+  const rect = el.getBoundingClientRect();
+  const maxLeft = Math.max(10, window.innerWidth - (rect.width || 280) - 10);
+  const maxTop = Math.max(10, window.innerHeight - (rect.height || 260) - 10);
+
+  let curLeft = parseInt(el.style.left, 10);
+  let curTop = parseInt(el.style.top, 10);
+  if (isNaN(curLeft)) curLeft = window.innerWidth - 300;
+  if (isNaN(curTop)) curTop = 80;
+
+  curLeft = Math.min(Math.max(10, curLeft), maxLeft);
+  curTop = Math.min(Math.max(10, curTop), maxTop);
+
+  el.style.left = `${curLeft}px`;
+  el.style.top = `${curTop}px`;
+}
+
+function makeElementDraggable(windowEl, headerEl) {
+  if (!windowEl || !headerEl) return;
+
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let initialLeft = 0;
+  let initialTop = 0;
+
+  const onDragStart = (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+      return;
+    }
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    isDragging = true;
+    startX = clientX;
+    startY = clientY;
+
+    const rect = windowEl.getBoundingClientRect();
+    initialLeft = rect.left;
+    initialTop = rect.top;
+
+    windowEl.style.left = `${initialLeft}px`;
+    windowEl.style.top = `${initialTop}px`;
+    windowEl.style.right = 'auto';
+    windowEl.style.bottom = 'auto';
+
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+    document.addEventListener('touchmove', onDragMove, { passive: false });
+    document.addEventListener('touchend', onDragEnd);
+  };
+
+  const onDragMove = (e) => {
+    if (!isDragging) return;
+    if (e.cancelable && e.type === 'touchmove') e.preventDefault();
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const deltaX = clientX - startX;
+    const deltaY = clientY - startY;
+
+    const rect = windowEl.getBoundingClientRect();
+    const maxLeft = Math.max(10, window.innerWidth - rect.width - 10);
+    const maxTop = Math.max(10, window.innerHeight - rect.height - 10);
+
+    const newLeft = Math.min(Math.max(10, initialLeft + deltaX), maxLeft);
+    const newTop = Math.min(Math.max(10, initialTop + deltaY), maxTop);
+
+    windowEl.style.left = `${newLeft}px`;
+    windowEl.style.top = `${newTop}px`;
+  };
+
+  const onDragEnd = () => {
+    if (!isDragging) return;
+    isDragging = false;
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('touchend', onDragEnd);
+
+    // Save position
+    try {
+      const pos = { left: windowEl.style.left, top: windowEl.style.top };
+      localStorage.setItem(COUNTER_POS_STORAGE_KEY, JSON.stringify(pos));
+    } catch (e) {}
+  };
+
+  headerEl.addEventListener('mousedown', onDragStart);
+  headerEl.addEventListener('touchstart', onDragStart, { passive: true });
+
+  window.addEventListener('resize', () => {
+    clampWindowToViewport(windowEl);
+  });
+}
+
+function initFloatingCounter() {
+  loadCounterState();
+
+  const win = document.getElementById('floatingCounterWindow');
+  const header = document.getElementById('fcHeader');
+  const pill = document.getElementById('floatingCounterPill');
+  const btnTop = document.getElementById('btnToggleFloatingCounter');
+  const btnMem = document.getElementById('memToggleCounterBtn');
+  const btnInc = document.getElementById('fcBtnIncrement');
+  const btnDec = document.getElementById('fcBtnDecrement');
+  const btnReset = document.getElementById('fcBtnReset');
+  const btnLog = document.getElementById('fcBtnLogSession');
+  const btnClose = document.getElementById('fcBtnClose');
+  const btnMin = document.getElementById('fcBtnMinimize');
+  const btnToggleHist = document.getElementById('fcBtnToggleHistory');
+  const btnClearHist = document.getElementById('fcBtnClearHistory');
+  const btnBackCounter = document.getElementById('fcBtnBackToCounter');
+  const quickPlus = document.getElementById('fcpQuickPlus');
+  const targetSelect = document.getElementById('fcTargetSelect');
+  const autoAdvance = document.getElementById('fcAutoAdvanceCheck');
+  const counterView = document.getElementById('fcCounterView');
+  const historyView = document.getElementById('fcHistoryView');
+
+  // Restore saved position
+  try {
+    const rawPos = localStorage.getItem(COUNTER_POS_STORAGE_KEY);
+    if (rawPos && win) {
+      const pos = JSON.parse(rawPos);
+      if (pos.left) win.style.left = pos.left;
+      if (pos.top) win.style.top = pos.top;
+      win.style.right = 'auto';
+      win.style.bottom = 'auto';
+    }
+  } catch (e) {}
+
+  makeElementDraggable(win, header);
+
+  // Auto-repeat / Hold on increment and decrement buttons
+  setupHoldZone(btnInc, () => incrementFloatingCounter(true));
+  setupHoldZone(btnDec, () => decrementFloatingCounter(true));
+
+  // Footer Actions
+  if (btnReset) btnReset.addEventListener('click', resetFloatingCounter);
+  if (btnLog) btnLog.addEventListener('click', logCounterSession);
+
+  // Target and Auto-Advance options
+  if (targetSelect) {
+    targetSelect.addEventListener('change', (e) => {
+      counterState.target = parseInt(e.target.value, 10) || 0;
+      saveCounterState();
+      updateCounterDisplay();
+    });
+  }
+  if (autoAdvance) {
+    autoAdvance.addEventListener('change', (e) => {
+      counterState.autoAdvance = e.target.checked;
+      saveCounterState();
+    });
+  }
+
+  // Header actions
+  if (btnClose) btnClose.addEventListener('click', closeFloatingCounter);
+  if (btnMin) btnMin.addEventListener('click', minimizeFloatingCounter);
+
+  // Toggle History View
+  if (btnToggleHist) {
+    btnToggleHist.addEventListener('click', () => {
+      if (counterView && historyView) {
+        const isHistVisible = historyView.style.display !== 'none';
+        counterView.style.display = isHistVisible ? 'block' : 'none';
+        historyView.style.display = isHistVisible ? 'none' : 'block';
+        if (!isHistVisible) renderCounterHistory();
+      }
+    });
+  }
+  if (btnBackCounter) {
+    btnBackCounter.addEventListener('click', () => {
+      if (counterView && historyView) {
+        counterView.style.display = 'block';
+        historyView.style.display = 'none';
+      }
+    });
+  }
+  if (btnClearHist) btnClearHist.addEventListener('click', clearCounterHistory);
+
+  // Pill interactions
+  if (pill) {
+    pill.addEventListener('click', (e) => {
+      if (e.target === quickPlus || e.target.closest('#fcpQuickPlus')) return;
+      openFloatingCounter();
+    });
+  }
+  if (quickPlus) {
+    quickPlus.addEventListener('click', (e) => {
+      e.stopPropagation();
+      incrementFloatingCounter();
+    });
+  }
+
+  // Toggle buttons from navigation bars
+  if (btnTop) btnTop.addEventListener('click', toggleFloatingCounter);
+  if (btnMem) btnMem.addEventListener('click', toggleFloatingCounter);
+
+  // Initial State restoration
+  if (counterState.isOpen) {
+    if (counterState.isMinimized) {
+      minimizeFloatingCounter();
+    } else {
+      openFloatingCounter();
+    }
+  } else {
+    closeFloatingCounter();
+  }
+
+  updateCounterDisplay();
 }
 
 // =========================================================
@@ -9446,9 +10092,11 @@ initAyahNotes();
 bootstrapRevlogFromExistingCards();
 initGdriveSync();
 initGamepadSupport();
+initFloatingCounter();
 checkUrlHashSync();
 showLibraryView();
 loadSurah(76).then(() => {
+  updateCounterAyahTag();
   updateFsrsBadgeAndNotifications(false);
   updateOfflineStorageStatus();
   if (isLibraryView) {
